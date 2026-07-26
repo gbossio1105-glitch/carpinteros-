@@ -191,6 +191,21 @@ function App(){
       if(!data){
         data = seedInicial();
         await storageSet("carpinteros_v1", data);
+      } else {
+        // Migración: si hay carpinteros guardados con el campo viejo "telefono"
+        // (texto simple) y sin "telefonos" (lista nueva), los convertimos acá
+        // para no perder los datos ya cargados.
+        let huboMigracion = false;
+        const carpinterosMigrados = data.carpinteros.map(c=>{
+          if(c.telefonos) return c; // ya está en formato nuevo, no tocar
+          huboMigracion = true;
+          const { telefono, ...resto } = c;
+          return {...resto, telefonos: separarTelefonos(telefono)};
+        });
+        if(huboMigracion){
+          data = {...data, carpinteros: carpinterosMigrados};
+          await storageSet("carpinteros_v1", data);
+        }
       }
       setDb(data);
       setCargando(false);
