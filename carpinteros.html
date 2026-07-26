@@ -117,8 +117,47 @@ function colorEvento(tipoId){
   return mapa[color];
 }
 
+// Convierte un texto de teléfono viejo (posiblemente con varios números pegados
+// por guiones o espacios, en formato área-número repetido) en una lista de
+// teléfonos [{id, nombre, numero}]. Reconstruye "código de área + número local"
+// cuando detecta un grupo corto (el área) seguido de uno o más números cortos
+// que la comparten.
+function separarTelefonos(texto){
+  if(!texto || !texto.trim()) return [];
+  const grupos = texto.match(/\d+/g) || [];
+  if(grupos.length === 0) return [];
+
+  const numeros = [];
+  let i = 0;
+  while(i < grupos.length){
+    const g = grupos[i];
+    if(g.length >= 10){
+      numeros.push(g);
+      i++;
+    } else if(g.length <= 4 && i+1 < grupos.length){
+      const area = g;
+      i++;
+      let sumoAlguno = false;
+      while(i < grupos.length && grupos[i].length >= 5 && grupos[i].length <= 7){
+        numeros.push(area + grupos[i]);
+        i++;
+        sumoAlguno = true;
+      }
+      if(!sumoAlguno) numeros.push(area); // caso raro: área suelta sin número asociado
+    } else {
+      if(g.length >= 4) numeros.push(g);
+      i++;
+    }
+  }
+  const unicos = [...new Set(numeros)];
+  return unicos.map(n => ({ id: uid("tel"), nombre:"", numero:n }));
+}
+
 function seedInicial(){
-  const carpinteros = SEED_CARPINTEROS.map(c => ({...c, id: uid("carp"), eventos: []}));
+  const carpinteros = SEED_CARPINTEROS.map(c => {
+    const { telefono, ...resto } = c;
+    return {...resto, id: uid("carp"), eventos: [], telefonos: separarTelefonos(telefono)};
+  });
   return { carpinteros };
 }
 
@@ -133,6 +172,9 @@ function App(){
   const [filtroRuta, setFiltroRuta] = useState("todas");
   const [orden, setOrden] = useState("nombre");
   const [toast, setToast] = useState(null);
+  const [modoSeleccion, setModoSeleccion] = useState(false);
+  const [seleccionados, setSeleccionados] = useState(()=> new Set());
+  const [modalEventoMasivo, setModalEventoMasivo] = useState(false);
 
   const mostrarToast = useCallback((msg)=>{ setToast({msg, id:Date.now()}); }, []);
 
@@ -195,6 +237,37 @@ function App(){
     mostrarToast("Evento eliminado");
   }
 
+  async function agregarEventoMasivo(eventoBase){
+    const idsSeleccionados = seleccionados;
+    const nuevos = db.carpinteros.map(c=>{
+      if(!idsSeleccionados.has(c.id)) return c;
+      const eventos = c.eventos || [];
+      const evento = {...eventoBase, id: uid("ev")};
+      return {...c, eventos: [evento, ...eventos]};
+    });
+    await guardarDb({...db, carpinteros: nuevos});
+    mostrarToast(`Evento registrado en ${idsSeleccionados.size} carpinteros`);
+    setSeleccionados(new Set());
+    setModoSeleccion(false);
+    setModalEventoMasivo(false);
+  }
+
+  function alternarSeleccion(id){
+    setSeleccionados(prev=>{
+      const next = new Set(prev);
+      if(next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+
+  function seleccionarTodosFiltrados(){
+    setSeleccionados(new Set(carpinterosFiltrados.map(c=>c.id)));
+  }
+
+  function limpiarSeleccion(){
+    setSeleccionados(new Set());
+  }
+
   const localidades = useMemo(()=>{
     if(!db) return [];
     return ["todas", ...new Set(db.carpinteros.map(c=>c.localidad).filter(Boolean))].sort();
@@ -207,7 +280,8 @@ function App(){
       if(filtroRuta!=="todas" && (c.ruta||"Sin especificar")!==filtroRuta) return false;
       if(busqueda){
         const q = busqueda.toLowerCase();
-        return c.nombre.toLowerCase().includes(q) || (c.localidad||"").toLowerCase().includes(q) || (c.telefono||"").includes(q);
+        const telefonosTexto = (c.telefonos||[]).map(t=>t.numero+" "+(t.nombre||"")).join(" ").toLowerCase();
+        return c.nombre.toLowerCase().includes(q) || (c.localidad||"").toLowerCase().includes(q) || telefonosTexto.includes(q);
       }
       return true;
     });
@@ -252,6 +326,12 @@ function App(){
             style={{padding:"10px 16px", borderRadius:8, border:"none", background:"var(--azul-600)", color:"#fff", fontSize:14, fontWeight:600, whiteSpace:"nowrap"}}>
             + Carpintero
           </button>
+          <button onClick={()=>{ if(modoSeleccion){ limpiarSeleccion(); } setModoSeleccion(m=>!m); }}
+            style={{padding:"10px 16px", borderRadius:8, border: modoSeleccion ? "none" : "1px solid var(--azul-500)",
+              background: modoSeleccion ? "var(--rojo-600)" : "#fff", color: modoSeleccion ? "#fff" : "var(--azul-600)",
+              fontSize:14, fontWeight:600, whiteSpace:"nowrap"}}>
+            {modoSeleccion ? "✕ Cancelar selección" : "☑ Selección masiva"}
+          </button>
         </div>
 
         <div style={{display:"flex", gap:8, marginBottom:16, flexWrap:"wrap"}}>
@@ -271,6 +351,18 @@ function App(){
           </select>
         </div>
 
+        {modoSeleccion && (
+          <div style={{display:"flex", gap:10, alignItems:"center", marginBottom:14, fontSize:13}}>
+            <span style={{color:"var(--gris-700)", fontWeight:600}}>{seleccionados.size} seleccionados</span>
+            <button onClick={seleccionarTodosFiltrados} style={{background:"none", border:"none", color:"var(--azul-600)", fontWeight:600, padding:0}}>
+              Seleccionar los {carpinterosFiltrados.length} filtrados
+            </button>
+            <button onClick={limpiarSeleccion} style={{background:"none", border:"none", color:"var(--gris-500)", padding:0}}>
+              Ninguno
+            </button>
+          </div>
+        )}
+
         {carpinterosFiltrados.length===0 ? (
           <div style={{textAlign:"center", padding:"40px 20px", color:"var(--gris-500)", fontSize:14}}>
             {db.carpinteros.length===0 ? "Todavía no cargaste ningún carpintero." : "No hay carpinteros que coincidan con el filtro."}
@@ -280,8 +372,12 @@ function App(){
             {carpinterosFiltrados.map(c=>{
               const ultimoEvento = (c.eventos||[])[0];
               return (
-              <div key={c.id} style={{background:"#fff", border:"1px solid var(--gris-100)", borderRadius:12, padding:"14px 16px"}}>
+              <div key={c.id} style={{background:"#fff", border: modoSeleccion && seleccionados.has(c.id) ? "2px solid var(--azul-500)" : "1px solid var(--gris-100)", borderRadius:12, padding:"14px 16px"}}>
                 <div style={{display:"flex", justifyContent:"space-between", alignItems:"flex-start", gap:10}}>
+                  {modoSeleccion && (
+                    <input type="checkbox" checked={seleccionados.has(c.id)} onChange={()=>alternarSeleccion(c.id)}
+                      style={{width:20, height:20, flexShrink:0, marginTop:2}} />
+                  )}
                   <div style={{flex:1, minWidth:0}}>
                     <div style={{fontWeight:700, fontSize:15}}>{c.nombre}</div>
                     <div style={{fontSize:12.5, color:"var(--gris-500)", marginTop:3}}>
@@ -293,12 +389,14 @@ function App(){
                       </span>
                     )}
                     {c.domicilio && <div style={{fontSize:12, color:"var(--gris-500)", marginTop:4}}>{c.domicilio}</div>}
-                    {c.telefono && (
-                      <a href={`https://wa.me/54${c.telefono.replace(/[^0-9]/g,"")}`} target="_blank" rel="noopener"
-                        style={{fontSize:12.5, color:"var(--verde-600)", textDecoration:"none", display:"inline-block", marginTop:4, fontWeight:600}}>
-                        📱 {c.telefono}
-                      </a>
-                    )}
+                    {(c.telefonos||[]).map(t=>(
+                      <div key={t.id} style={{marginTop:4}}>
+                        <a href={`https://wa.me/54${t.numero.replace(/[^0-9]/g,"")}`} target="_blank" rel="noopener"
+                          style={{fontSize:12.5, color:"var(--verde-600)", textDecoration:"none", display:"inline-block", fontWeight:600}}>
+                          📱 {t.nombre ? `${t.nombre} — ${t.numero}` : t.numero}
+                        </a>
+                      </div>
+                    ))}
                   </div>
                 </div>
 
@@ -325,6 +423,16 @@ function App(){
         )}
       </main>
 
+      {modoSeleccion && seleccionados.size>0 && (
+        <div style={{position:"fixed", bottom:0, left:0, right:0, background:"var(--azul-900)", padding:"12px 16px", display:"flex", alignItems:"center", justifyContent:"space-between", gap:12, zIndex:60, boxShadow:"0 -4px 16px rgba(0,0,0,0.15)"}}>
+          <span style={{color:"#fff", fontSize:14, fontWeight:600}}>{seleccionados.size} seleccionados</span>
+          <button onClick={()=>setModalEventoMasivo(true)}
+            style={{padding:"10px 18px", borderRadius:8, border:"none", background:"var(--verde-600)", color:"#fff", fontWeight:700, fontSize:14}}>
+            Aplicar evento
+          </button>
+        </div>
+      )}
+
       {modalAbierto && (
         <ModalCarpintero carpintero={editando} onGuardar={guardarCarpintero} onCerrar={()=>{setModalAbierto(false); setEditando(null);}} />
       )}
@@ -335,6 +443,14 @@ function App(){
           onAgregar={(ev)=>agregarEvento(carpinteroEventos.id, ev)}
           onEliminar={(evId)=>eliminarEvento(carpinteroEventos.id, evId)}
           onCerrar={()=>setCarpinteroEventos(null)}
+        />
+      )}
+
+      {modalEventoMasivo && (
+        <ModalEventoMasivo
+          cantidad={seleccionados.size}
+          onAplicar={agregarEventoMasivo}
+          onCerrar={()=>setModalEventoMasivo(false)}
         />
       )}
 
@@ -349,14 +465,27 @@ function App(){
 
 function ModalCarpintero({carpintero, onGuardar, onCerrar}){
   const [form, setForm] = useState(carpintero || {
-    id: uid("carp"), nombre:"", domicilio:"", localidad:"", provincia:"", telefono:"", ruta:""
+    id: uid("carp"), nombre:"", domicilio:"", localidad:"", provincia:"", telefonos:[], ruta:""
   });
 
   function actualizar(campo, valor){ setForm(f=>({...f, [campo]: valor})); }
 
+  function actualizarTelefono(id, campo, valor){
+    setForm(f=>({...f, telefonos: (f.telefonos||[]).map(t=> t.id===id ? {...t, [campo]:valor} : t)}));
+  }
+
+  function agregarTelefono(){
+    setForm(f=>({...f, telefonos: [...(f.telefonos||[]), {id: uid("tel"), nombre:"", numero:""}]}));
+  }
+
+  function quitarTelefono(id){
+    setForm(f=>({...f, telefonos: (f.telefonos||[]).filter(t=>t.id!==id)}));
+  }
+
   function confirmar(){
     if(!form.nombre.trim()){ alert("Ingresá el nombre del carpintero."); return; }
-    onGuardar({...form, nombre: form.nombre.trim()});
+    const telefonosLimpios = (form.telefonos||[]).filter(t=>t.numero && t.numero.trim());
+    onGuardar({...form, nombre: form.nombre.trim(), telefonos: telefonosLimpios});
   }
 
   return (
@@ -381,8 +510,21 @@ function ModalCarpintero({carpintero, onGuardar, onCerrar}){
           </Campo>
         </div>
 
-        <Campo label="Teléfono">
-          <input value={form.telefono} onChange={e=>actualizar("telefono", e.target.value)} style={inputStyle} placeholder="Ej: 3564510034" />
+        <Campo label="Teléfonos">
+          {(form.telefonos||[]).map(t=>(
+            <div key={t.id} style={{display:"flex", gap:6, marginBottom:8, alignItems:"center"}}>
+              <input value={t.nombre} onChange={e=>actualizarTelefono(t.id,"nombre",e.target.value)}
+                style={{...inputStyle, flex:"1 1 90px"}} placeholder="Nombre (opcional)" />
+              <input value={t.numero} onChange={e=>actualizarTelefono(t.id,"numero",e.target.value)}
+                style={{...inputStyle, flex:"1 1 130px"}} placeholder="Ej: 3564510034" />
+              <button onClick={()=>quitarTelefono(t.id)} type="button"
+                style={{background:"none", border:"none", color:"var(--rojo-600)", fontSize:18, padding:"0 4px", flexShrink:0}}>✕</button>
+            </div>
+          ))}
+          <button onClick={agregarTelefono} type="button"
+            style={{fontSize:12.5, color:"var(--azul-600)", background:"none", border:"1px dashed var(--azul-500)", borderRadius:7, padding:"6px 10px", width:"100%"}}>
+            + Agregar teléfono
+          </button>
         </Campo>
 
         <Campo label="Ruta de acceso">
@@ -404,13 +546,25 @@ function ModalCarpintero({carpintero, onGuardar, onCerrar}){
 function ModalEventos({carpintero, onAgregar, onEliminar, onCerrar}){
   const [tipo, setTipo] = useState(TIPOS_EVENTO[0].id);
   const [comentario, setComentario] = useState("");
+  const [fecha, setFecha] = useState(()=>{
+    const hoy = new Date();
+    const yyyy = hoy.getFullYear();
+    const mm = String(hoy.getMonth()+1).padStart(2,"0");
+    const dd = String(hoy.getDate()).padStart(2,"0");
+    return `${yyyy}-${mm}-${dd}`;
+  });
 
   const eventos = carpintero.eventos || [];
 
   function agregar(){
+    // Tomamos la fecha elegida (yyyy-mm-dd) y le sumamos la hora actual,
+    // así el orden de "último contacto" sigue siendo preciso dentro del mismo día.
+    const ahora = new Date();
+    const [y,m,d] = fecha.split("-").map(Number);
+    const fechaFinal = new Date(y, m-1, d, ahora.getHours(), ahora.getMinutes(), ahora.getSeconds());
     onAgregar({
       id: uid("ev"),
-      fecha: new Date().toISOString(),
+      fecha: fechaFinal.toISOString(),
       tipo,
       comentario: comentario.trim()
     });
@@ -429,11 +583,14 @@ function ModalEventos({carpintero, onAgregar, onEliminar, onCerrar}){
               {TIPOS_EVENTO.map(t=> <option key={t.id} value={t.id}>{t.label}</option>)}
             </select>
           </Campo>
+          <Campo label="Fecha">
+            <input type="date" value={fecha} onChange={e=>setFecha(e.target.value)} style={inputStyle} />
+          </Campo>
           <Campo label="Comentario (opcional)">
             <textarea value={comentario} onChange={e=>setComentario(e.target.value)} rows={2} style={{...inputStyle, resize:"vertical"}} placeholder="Alguna nota sobre este contacto..." />
           </Campo>
           <button onClick={agregar} style={{width:"100%", padding:"9px", borderRadius:8, border:"none", background:"var(--verde-600)", color:"#fff", fontWeight:600, fontSize:13.5}}>
-            + Registrar evento de hoy
+            + Registrar evento
           </button>
         </div>
 
@@ -464,6 +621,59 @@ function ModalEventos({carpintero, onAgregar, onEliminar, onCerrar}){
 
         <div style={{marginTop:18}}>
           <button onClick={onCerrar} style={{width:"100%", padding:"10px", borderRadius:8, border:"1px solid var(--gris-300)", background:"#fff"}}>Cerrar</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ModalEventoMasivo({cantidad, onAplicar, onCerrar}){
+  const [tipo, setTipo] = useState(TIPOS_EVENTO[0].id);
+  const [comentario, setComentario] = useState("");
+  const [fecha, setFecha] = useState(()=>{
+    const hoy = new Date();
+    const yyyy = hoy.getFullYear();
+    const mm = String(hoy.getMonth()+1).padStart(2,"0");
+    const dd = String(hoy.getDate()).padStart(2,"0");
+    return `${yyyy}-${mm}-${dd}`;
+  });
+
+  function aplicar(){
+    const ahora = new Date();
+    const [y,m,d] = fecha.split("-").map(Number);
+    const fechaFinal = new Date(y, m-1, d, ahora.getHours(), ahora.getMinutes(), ahora.getSeconds());
+    onAplicar({
+      fecha: fechaFinal.toISOString(),
+      tipo,
+      comentario: comentario.trim()
+    });
+  }
+
+  return (
+    <div className="modal-overlay" style={{position:"fixed", inset:0, background:"rgba(10,20,35,0.5)", display:"flex", alignItems:"center", justifyContent:"center", zIndex:70, padding:16}} onClick={onCerrar}>
+      <div className="modal-box" style={{background:"#fff", borderRadius:14, padding:"24px 22px", width:460, maxWidth:"100%", maxHeight:"90vh", overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
+        <h3 style={{marginTop:0, fontSize:17, fontWeight:700}}>Aplicar evento masivo</h3>
+        <p style={{fontSize:13, color:"var(--gris-500)", marginTop:0, marginBottom:16}}>
+          Se va a registrar en {cantidad} carpinteros seleccionados.
+        </p>
+
+        <Campo label="¿Qué pasó?">
+          <select value={tipo} onChange={e=>setTipo(e.target.value)} style={inputStyle}>
+            {TIPOS_EVENTO.map(t=> <option key={t.id} value={t.id}>{t.label}</option>)}
+          </select>
+        </Campo>
+        <Campo label="Fecha">
+          <input type="date" value={fecha} onChange={e=>setFecha(e.target.value)} style={inputStyle} />
+        </Campo>
+        <Campo label="Comentario (opcional)">
+          <textarea value={comentario} onChange={e=>setComentario(e.target.value)} rows={2} style={{...inputStyle, resize:"vertical"}} placeholder="Ej: Aviso de viaje a la zona..." />
+        </Campo>
+
+        <div style={{display:"flex", gap:10, marginTop:18}}>
+          <button onClick={onCerrar} style={{flex:1, padding:"10px", borderRadius:8, border:"1px solid var(--gris-300)", background:"#fff"}}>Cancelar</button>
+          <button onClick={aplicar} style={{flex:1, padding:"10px", borderRadius:8, border:"none", background:"var(--verde-600)", color:"#fff", fontWeight:600}}>
+            Aplicar a {cantidad}
+          </button>
         </div>
       </div>
     </div>
