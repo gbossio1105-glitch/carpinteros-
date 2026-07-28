@@ -48,7 +48,7 @@
 
 const { useState, useEffect, useMemo, useCallback } = React;
 
-const SEED_CARPINTEROS = [{"nombre": "ACOSTA CARLOS DANIEL", "domicilio": "CHACRA 41 MANZANº4 PC 35", "localidad": "7114 CASTELLI", "provincia": "CHACO", "telefono": "3644412141", "ruta": "Ruta Nacional 95"}, {"nombre": "ADOR MARCELO", "domicilio": "COLOMBIA 1547", "localidad": "2400 SAN FRANCISCO", "provincia": "CORDOBA", "telefono": "3564510034", "ruta": "Ruta Nacional 19"}, {"nombre": "AIMAR VICTOR", "domicilio": "SAN JUAN 1366", "localidad": "2400 SAN FRANCISCO", "provincia": "CORDOBA", "telefono": "3564583657", "ruta": "Ruta Nacional 19"}, {"nombre": "ALEJANDRO PINDADO", "domicilio": "", "localidad": "2400 SAN FRANCISCO", "provincia": "CORDOBA", "telefono": "3564577359", "ruta": "Ruta Nacional 19"}, {"nombre": "ALESSANDRIA EMILIANO", "domicilio": "INT CURTO 826 / MITRE 855", "localidad": "435 PORTEÑA", "provincia": "CORDOBA", "telefono": "3564638351", "ruta": "Ruta Provincial 1 (Córdoba)"}, {"nombre": "ALESSANDRIA FABIAN", "domicilio": "FALUCHO 181", "localidad": "0143 LA PAQUITA", "provincia": "CORDOBA", "telefono": "3562509368", "ruta": "Ruta Provincial 17"}, {"nombre": "AMAYA DARIO", "domicilio": "MAIPU ESQ MIRANDA", "localidad": "5967 LUQUE", "provincia": "CORDOBA", "telefono": "3573496026", "ruta": "Ruta Provincial 13 (Córdoba)"}, {"nombre": "AMOBLAMIENTO CHICOO (OMAR CHICOO )", "domicilio": "RIVADAVIA Y SARMIENTO", "localidad": "435 PORTEÑA", "provincia": "CORDOBA", "telefono": "3564621402", "ruta": "Ruta Provincial 1 (Córdoba)"}, {"nombre": "AMOBLAMIENTO ROOM BOBBONI CINTIA", "domicilio": "FALUCHO 2077", "localidad": "2451 SAN JORGE", "provincia": "SANTA FE", "telefono": "3406645918", "ruta": "Ruta Provincial 13 (Santa Fe)"}, {"nombre": "AMOBLAMIENTOS GIORDANO MARIANO", "domicilio": "GENERAL LOPEZ 635", "localidad": "2454 C.ROSQUIN", "provincia": "SANTA FE", "telefono": "3401-592474", "ruta": "Ruta Nacional 34"}, {"nombre": "BARTOLI HNOS", "domicilio": "COLON 649", "localidad": "2421 MORTEROS", "provincia": "CORDOBA", "telefono": "3562-519814-445809", "ruta": "Ruta Provincial 1 (Córdoba)"}, {"nombre": "BITSCHIN CESAR", "domicilio": "ANTONIO BALLATORE 1635", "localidad": "2434 ARROYITO", "provincia": "CORDOBA", "telefono": "3576650114", "ruta": "Ruta Nacional 19"}, {"nombre": "BONANCEA RUBEN", "domicilio": "CHACABUCO 2054", "localidad": "2440 SASTRE", "provincia": "SANTA FE", "telefono": "3406517753", "ruta": "Ruta Provincial 13 (Santa Fe)"}, {"nombre": "BOSETTI DANTE AMOBLAMIENTOS", "domicilio": "BARTOLOME MITRE 1260", "localidad": "2434 ARROYITO", "provincia": "CORDOBA", "telefono": "3576-653162", "ruta": "Ruta Nacional 19"}, {"nombre": "BOSETTI WALTER CARPINTERIA", "domicilio": "VICENTE ORELLANO 1010", "localidad": "2434 ARROYITO", "provincia": "CORDOBA", "telefono": "3576-479221", "ruta": "Ruta Nacional 19"}, {"nombre": "BRUNO AMOBLAMIENTOS ( DANIEL )", "domicilio": "IRIGOYEN 256", "localidad": "5940 LAS VARILLAS", "provincia": "CORDOBA", "telefono": "3533-440202- 4401110", "ruta": "Ruta 158"}, {"nombre": "BUFFA ISMAEL CARLOS", "domicilio": "RICHIERI 1311", "localidad": "2440 SASTRE", "provincia": "SANTA FE", "telefono": "3406426714", "ruta": "Ruta Provincial 13 (Santa Fe)"}, {"nombre": "CARPINTERIA CAPTAR (HIDALGO EZEQUIEL)", "domicilio": "LAS HERAS 654", "localidad": "2419 BRINKMANN", "provincia": "CORDOBA", "telefono": "3562505235", "ruta": "Ruta Provincial 1 (Córdoba)"}, {"nombre": "CARPINTERIA CORRA (PEDRUEZA DEMIAN )", "domicilio": "SAN JUAN Y SARMIENTO", "localidad": "2419 BRINKMANN", "provincia": "CORDOBA", "telefono": "3562-412810-564929-481335", "ruta": "Ruta Provincial 1 (Córdoba)"}, {"nombre": "CARPINTERIA DISEÑO (JOSE L CORDOBA )", "domicilio": "J NEWVERY 845", "localidad": "2421 MORTEROS", "provincia": "CORDOBA", "telefono": "3562514576 - 3925238602", "ruta": "Ruta Provincial 1 (Córdoba)"}, {"nombre": "CARPINTERIA GUIZZO (DARIO Y RUBEN )", "domicilio": "VELEZ SARFIELD 613", "localidad": "2434 ARROYITO", "provincia": "CORDOBA", "telefono": "3576-447906- 466384", "ruta": "Ruta Nacional 19"}, {"nombre": "CARPINTERIA LA IDEAL", "domicilio": "PTE PERON 799", "localidad": "2451 SAN JORGE", "provincia": "SANTA FE", "telefono": "3406-418543-504971", "ruta": "Ruta Provincial 13 (Santa Fe)"}, {"nombre": "CARPINTERIA OVIEDO (LALO) EDUARDO", "domicilio": "CHACO 170", "localidad": "2550 BELL VILLE", "provincia": "CORDOBA", "telefono": "3537448571", "ruta": "Ruta Nacional 9"}, {"nombre": "CARPINTERIA RAMIREZ", "domicilio": "GUEMES 70", "localidad": "2494 LEONES", "provincia": "CORDOBA", "telefono": "3472-500246", "ruta": "Ruta Nacional 9"}, {"nombre": "CARPINTERIA REVESTIMIENTO (GIECCO- GOTARDI )", "domicilio": "EVA PERON Y SARMIENTO", "localidad": "2419 BRINKMANN", "provincia": "CORDOBA", "telefono": "3562-444318-569479", "ruta": "Ruta Provincial 1 (Córdoba)"}, {"nombre": "CASATEC S. A.", "domicilio": "BV. SANTA FE 931", "localidad": "5949 ALICIA", "provincia": "CORDOBA", "telefono": "3533419164", "ruta": "Ruta Provincial 13 (Córdoba)"}, {"nombre": "CASTELARI RENE", "domicilio": "RIOJA 1253", "localidad": "2400 SAN FRANCISCO", "provincia": "CORDOBA", "telefono": "3564569695", "ruta": "Ruta Nacional 19"}, {"nombre": "CASTELARI ROBERTO CARLOS", "domicilio": "DR MANUEL BELGRANO 124", "localidad": "5967 LUQUE", "provincia": "CORDOBA", "telefono": "", "ruta": "Ruta Provincial 13 (Córdoba)"}, {"nombre": "CHIAVASSA MAURICIO", "domicilio": "JUAN DIAZ DE SOLIS 2417", "localidad": "2400 SAN FRANCISCO", "provincia": "CORDOBA", "telefono": "3564644070", "ruta": "Ruta Nacional 19"}, {"nombre": "CUBERLI  FABIAN", "domicilio": "LAS HERAS 745", "localidad": "2421 MORTEROS", "provincia": "CORDOBA", "telefono": "3562416475", "ruta": "Ruta Provincial 1 (Córdoba)"}, {"nombre": "CUGGINO SERGIO", "domicilio": "NO ESPECIFICADO", "localidad": "5940 LAS VARILLAS", "provincia": "CORDOBA", "telefono": "", "ruta": "Ruta 158"}, {"nombre": "DURAN EMILIANO ARIEL", "domicilio": "RIVADAVIA 385", "localidad": "5967 LUQUE", "provincia": "CORDOBA", "telefono": "3573433589", "ruta": "Ruta Provincial 13 (Córdoba)"}, {"nombre": "ENGELHARDT MATIAS", "domicilio": "ARTURO ILLIA 331", "localidad": "5539 HERMOSO CAMPO", "provincia": "CHACO", "telefono": "3735456078", "ruta": "Sin clasificar"}, {"nombre": "FAVETTO HORACIO", "domicilio": "MARCONI 466", "localidad": "2400 SAN FRANCISCO", "provincia": "CORDOBA", "telefono": "434381", "ruta": "Ruta Nacional 19"}, {"nombre": "FERACE EZEQUIEL CARPINTERIA", "domicilio": "TOMAS JUAREZ 1028 Y RIVADAVIA", "localidad": "2434 ARROYITO", "provincia": "CORDOBA", "telefono": "3576-482445", "ruta": "Ruta Nacional 19"}, {"nombre": "FERRATO ANDRES EDUARDO", "domicilio": "ESQUIU 46", "localidad": "5967 LUQUE", "provincia": "CORDOBA", "telefono": "3573514961", "ruta": "Ruta Provincial 13 (Córdoba)"}, {"nombre": "FERRERO MARCELO", "domicilio": "GUTIERREZ 2451", "localidad": "2400 SAN FRANCISCO", "provincia": "CORDOBA", "telefono": "3564415237", "ruta": "Ruta Nacional 19"}, {"nombre": "GOMEZ DANIEL", "domicilio": "JOSE VOCOS 1141", "localidad": "2434 ARROYITO", "provincia": "CORDOBA", "telefono": "3576-448054", "ruta": "Ruta Nacional 19"}, {"nombre": "GUIÑANES DIEGO (CARPINTERIA D C )", "domicilio": "BUENOS AIRES 1149", "localidad": "5949 ALICIA", "provincia": "CORDOBA", "telefono": "3533689972", "ruta": "Ruta Provincial 13 (Córdoba)"}, {"nombre": "HANG GABRIEL", "domicilio": "PUEYRREDON 871", "localidad": "2400 SAN FRANCISCO", "provincia": "CORDOBA", "telefono": "3564371962", "ruta": "Ruta Nacional 19"}, {"nombre": "MIRETTI FABIAN", "domicilio": "CARLOS MALDINI 740", "localidad": "2434 ARROYITO", "provincia": "CORDOBA", "telefono": "3576-472917", "ruta": "Ruta Nacional 19"}, {"nombre": "MORALES DARIO", "domicilio": "O. HERRERA", "localidad": "2550 BELL VILLE", "provincia": "CORDOBA", "telefono": "3537444372", "ruta": "Ruta Nacional 9"}, {"nombre": "MOTTURA MARCELO DANIEL", "domicilio": "SAN LORENZO ESQ 12 OCTUBRE", "localidad": "SAN GUILLERMO", "provincia": "SANTA FE", "telefono": "3424303613", "ruta": "Ruta Provincial 23 (Santa Fe)"}, {"nombre": "MUEBLES MODERNOS MELAMINA ( CLAUDIO VERA)", "domicilio": "GRAL SAVIO 703", "localidad": "2400 SAN FRANCISCO", "provincia": "CORDOBA", "telefono": "3564604119", "ruta": "Ruta Nacional 19"}, {"nombre": "ORELLANO ROBERTO", "domicilio": "GABOTO 375", "localidad": "2400 SAN FRANCISCO", "provincia": "CORDOBA", "telefono": "3564592517", "ruta": "Ruta Nacional 19"}, {"nombre": "PERRONE FABRICIO", "domicilio": "CELESTINO 107", "localidad": "5943 LASPIUR", "provincia": "CORDOBA", "telefono": "3533459956", "ruta": "Ruta 158"}, {"nombre": "PODEWILS  DARIO", "domicilio": "BV 25 DE MAYO 1059", "localidad": "2451 SAN JORGE", "provincia": "SANTA FE", "telefono": "3406-456306", "ruta": "Ruta Provincial 13 (Santa Fe)"}, {"nombre": "RACCA MATIAS", "domicilio": "CORRIENTES 264", "localidad": "435 PORTEÑA", "provincia": "CORDOBA", "telefono": "3564-652349-504220", "ruta": "Ruta Provincial 1 (Córdoba)"}, {"nombre": "REARTE GUSTAVO", "domicilio": "COLON Y PELEGRINI", "localidad": "2421 MORTEROS", "provincia": "CORDOBA", "telefono": "3562513479", "ruta": "Ruta Provincial 1 (Córdoba)"}, {"nombre": "REARTE MARCELO", "domicilio": "AYACUCHO Y GUEMES", "localidad": "2421 MORTEROS", "provincia": "CORDOBA", "telefono": "3562436984", "ruta": "Ruta Provincial 1 (Córdoba)"}, {"nombre": "REBOLA NORBERTO", "domicilio": "ACCESO RUTA 13", "localidad": "2440 SASTRE", "provincia": "SANTA FE", "telefono": "3406562278", "ruta": "Ruta Provincial 13 (Santa Fe)"}, {"nombre": "RUATTA ARIEL (LALO)", "domicilio": "RUTA 23", "localidad": "2349 SUARDI", "provincia": "SANTA FE", "telefono": "3562444533", "ruta": "Ruta Provincial 23 (Santa Fe)"}, {"nombre": "STICOTTI DIEGO", "domicilio": "25 DE MAYO 419", "localidad": "2426 LA FRANCIA", "provincia": "CORDOBA", "telefono": "3564574179", "ruta": "Ruta Nacional 19"}, {"nombre": "SUPPICICH ARIEL", "domicilio": "GRAL PAZ 1878", "localidad": "2434 ARROYITO", "provincia": "CORDOBA", "telefono": "3576-448054", "ruta": "Ruta Nacional 19"}, {"nombre": "VARAS WALTER", "domicilio": "MAIPU ESQUINA MIRANDA", "localidad": "5967 LUQUE", "provincia": "CORDOBA", "telefono": "3573415588", "ruta": "Ruta Provincial 13 (Córdoba)"}];
+const SEED_CARPINTEROS = [{"nombre": "ACOSTA CARLOS DANIEL", "domicilio": "CHACRA 41 MANZANº4 PC 35", "localidad": "7114 CASTELLI", "provincia": "CHACO", "telefono": "3644412141", "ruta": "Ruta Nacional 95"}, {"nombre": "ADOR MARCELO", "domicilio": "COLOMBIA 1547", "localidad": "2400 SAN FRANCISCO", "provincia": "CORDOBA", "telefono": "3564510034", "ruta": "San Francisco"}, {"nombre": "AIMAR VICTOR", "domicilio": "SAN JUAN 1366", "localidad": "2400 SAN FRANCISCO", "provincia": "CORDOBA", "telefono": "3564583657", "ruta": "San Francisco"}, {"nombre": "ALEJANDRO PINDADO", "domicilio": "", "localidad": "2400 SAN FRANCISCO", "provincia": "CORDOBA", "telefono": "3564577359", "ruta": "San Francisco"}, {"nombre": "ALESSANDRIA EMILIANO", "domicilio": "INT CURTO 826 / MITRE 855", "localidad": "435 PORTEÑA", "provincia": "CORDOBA", "telefono": "3564638351", "ruta": "Ruta Provincial 1 (Córdoba)"}, {"nombre": "ALESSANDRIA FABIAN", "domicilio": "FALUCHO 181", "localidad": "0143 LA PAQUITA", "provincia": "CORDOBA", "telefono": "3562509368", "ruta": "Ruta Provincial 17"}, {"nombre": "AMAYA DARIO", "domicilio": "MAIPU ESQ MIRANDA", "localidad": "5967 LUQUE", "provincia": "CORDOBA", "telefono": "3573496026", "ruta": "Ruta Provincial 13 (Córdoba)"}, {"nombre": "AMOBLAMIENTO CHICOO (OMAR CHICOO )", "domicilio": "RIVADAVIA Y SARMIENTO", "localidad": "435 PORTEÑA", "provincia": "CORDOBA", "telefono": "3564621402", "ruta": "Ruta Provincial 1 (Córdoba)"}, {"nombre": "AMOBLAMIENTO ROOM BOBBONI CINTIA", "domicilio": "FALUCHO 2077", "localidad": "2451 SAN JORGE", "provincia": "SANTA FE", "telefono": "3406645918", "ruta": "Ruta Provincial 13 (Santa Fe)"}, {"nombre": "AMOBLAMIENTOS GIORDANO MARIANO", "domicilio": "GENERAL LOPEZ 635", "localidad": "2454 C.ROSQUIN", "provincia": "SANTA FE", "telefono": "3401-592474", "ruta": "Ruta Nacional 34"}, {"nombre": "BARTOLI HNOS", "domicilio": "COLON 649", "localidad": "2421 MORTEROS", "provincia": "CORDOBA", "telefono": "3562-519814-445809", "ruta": "Ruta Provincial 1 (Córdoba)"}, {"nombre": "BITSCHIN CESAR", "domicilio": "ANTONIO BALLATORE 1635", "localidad": "2434 ARROYITO", "provincia": "CORDOBA", "telefono": "3576650114", "ruta": "Ruta Nacional 19"}, {"nombre": "BONANCEA RUBEN", "domicilio": "CHACABUCO 2054", "localidad": "2440 SASTRE", "provincia": "SANTA FE", "telefono": "3406517753", "ruta": "Ruta Provincial 13 (Santa Fe)"}, {"nombre": "BOSETTI DANTE AMOBLAMIENTOS", "domicilio": "BARTOLOME MITRE 1260", "localidad": "2434 ARROYITO", "provincia": "CORDOBA", "telefono": "3576-653162", "ruta": "Ruta Nacional 19"}, {"nombre": "BOSETTI WALTER CARPINTERIA", "domicilio": "VICENTE ORELLANO 1010", "localidad": "2434 ARROYITO", "provincia": "CORDOBA", "telefono": "3576-479221", "ruta": "Ruta Nacional 19"}, {"nombre": "BRUNO AMOBLAMIENTOS ( DANIEL )", "domicilio": "IRIGOYEN 256", "localidad": "5940 LAS VARILLAS", "provincia": "CORDOBA", "telefono": "3533-440202- 4401110", "ruta": "Ruta 158"}, {"nombre": "BUFFA ISMAEL CARLOS", "domicilio": "RICHIERI 1311", "localidad": "2440 SASTRE", "provincia": "SANTA FE", "telefono": "3406426714", "ruta": "Ruta Provincial 13 (Santa Fe)"}, {"nombre": "CARPINTERIA CAPTAR (HIDALGO EZEQUIEL)", "domicilio": "LAS HERAS 654", "localidad": "2419 BRINKMANN", "provincia": "CORDOBA", "telefono": "3562505235", "ruta": "Ruta Provincial 1 (Córdoba)"}, {"nombre": "CARPINTERIA CORRA (PEDRUEZA DEMIAN )", "domicilio": "SAN JUAN Y SARMIENTO", "localidad": "2419 BRINKMANN", "provincia": "CORDOBA", "telefono": "3562-412810-564929-481335", "ruta": "Ruta Provincial 1 (Córdoba)"}, {"nombre": "CARPINTERIA DISEÑO (JOSE L CORDOBA )", "domicilio": "J NEWVERY 845", "localidad": "2421 MORTEROS", "provincia": "CORDOBA", "telefono": "3562514576 - 3925238602", "ruta": "Ruta Provincial 1 (Córdoba)"}, {"nombre": "CARPINTERIA GUIZZO (DARIO Y RUBEN )", "domicilio": "VELEZ SARFIELD 613", "localidad": "2434 ARROYITO", "provincia": "CORDOBA", "telefono": "3576-447906- 466384", "ruta": "Ruta Nacional 19"}, {"nombre": "CARPINTERIA LA IDEAL", "domicilio": "PTE PERON 799", "localidad": "2451 SAN JORGE", "provincia": "SANTA FE", "telefono": "3406-418543-504971", "ruta": "Ruta Provincial 13 (Santa Fe)"}, {"nombre": "CARPINTERIA OVIEDO (LALO) EDUARDO", "domicilio": "CHACO 170", "localidad": "2550 BELL VILLE", "provincia": "CORDOBA", "telefono": "3537448571", "ruta": "Ruta Nacional 9"}, {"nombre": "CARPINTERIA RAMIREZ", "domicilio": "GUEMES 70", "localidad": "2494 LEONES", "provincia": "CORDOBA", "telefono": "3472-500246", "ruta": "Ruta Nacional 9"}, {"nombre": "CARPINTERIA REVESTIMIENTO (GIECCO- GOTARDI )", "domicilio": "EVA PERON Y SARMIENTO", "localidad": "2419 BRINKMANN", "provincia": "CORDOBA", "telefono": "3562-444318-569479", "ruta": "Ruta Provincial 1 (Córdoba)"}, {"nombre": "CASATEC S. A.", "domicilio": "BV. SANTA FE 931", "localidad": "5949 ALICIA", "provincia": "CORDOBA", "telefono": "3533419164", "ruta": "Ruta Provincial 13 (Córdoba)"}, {"nombre": "CASTELARI RENE", "domicilio": "RIOJA 1253", "localidad": "2400 SAN FRANCISCO", "provincia": "CORDOBA", "telefono": "3564569695", "ruta": "San Francisco"}, {"nombre": "CASTELARI ROBERTO CARLOS", "domicilio": "DR MANUEL BELGRANO 124", "localidad": "5967 LUQUE", "provincia": "CORDOBA", "telefono": "", "ruta": "Ruta Provincial 13 (Córdoba)"}, {"nombre": "CHIAVASSA MAURICIO", "domicilio": "JUAN DIAZ DE SOLIS 2417", "localidad": "2400 SAN FRANCISCO", "provincia": "CORDOBA", "telefono": "3564644070", "ruta": "San Francisco"}, {"nombre": "CUBERLI  FABIAN", "domicilio": "LAS HERAS 745", "localidad": "2421 MORTEROS", "provincia": "CORDOBA", "telefono": "3562416475", "ruta": "Ruta Provincial 1 (Córdoba)"}, {"nombre": "CUGGINO SERGIO", "domicilio": "NO ESPECIFICADO", "localidad": "5940 LAS VARILLAS", "provincia": "CORDOBA", "telefono": "", "ruta": "Ruta 158"}, {"nombre": "DURAN EMILIANO ARIEL", "domicilio": "RIVADAVIA 385", "localidad": "5967 LUQUE", "provincia": "CORDOBA", "telefono": "3573433589", "ruta": "Ruta Provincial 13 (Córdoba)"}, {"nombre": "ENGELHARDT MATIAS", "domicilio": "ARTURO ILLIA 331", "localidad": "5539 HERMOSO CAMPO", "provincia": "CHACO", "telefono": "3735456078", "ruta": "Sin clasificar"}, {"nombre": "FAVETTO HORACIO", "domicilio": "MARCONI 466", "localidad": "2400 SAN FRANCISCO", "provincia": "CORDOBA", "telefono": "434381", "ruta": "San Francisco"}, {"nombre": "FERACE EZEQUIEL CARPINTERIA", "domicilio": "TOMAS JUAREZ 1028 Y RIVADAVIA", "localidad": "2434 ARROYITO", "provincia": "CORDOBA", "telefono": "3576-482445", "ruta": "Ruta Nacional 19"}, {"nombre": "FERRATO ANDRES EDUARDO", "domicilio": "ESQUIU 46", "localidad": "5967 LUQUE", "provincia": "CORDOBA", "telefono": "3573514961", "ruta": "Ruta Provincial 13 (Córdoba)"}, {"nombre": "FERRERO MARCELO", "domicilio": "GUTIERREZ 2451", "localidad": "2400 SAN FRANCISCO", "provincia": "CORDOBA", "telefono": "3564415237", "ruta": "San Francisco"}, {"nombre": "GOMEZ DANIEL", "domicilio": "JOSE VOCOS 1141", "localidad": "2434 ARROYITO", "provincia": "CORDOBA", "telefono": "3576-448054", "ruta": "Ruta Nacional 19"}, {"nombre": "GUIÑANES DIEGO (CARPINTERIA D C )", "domicilio": "BUENOS AIRES 1149", "localidad": "5949 ALICIA", "provincia": "CORDOBA", "telefono": "3533689972", "ruta": "Ruta Provincial 13 (Córdoba)"}, {"nombre": "HANG GABRIEL", "domicilio": "PUEYRREDON 871", "localidad": "2400 SAN FRANCISCO", "provincia": "CORDOBA", "telefono": "3564371962", "ruta": "San Francisco"}, {"nombre": "MIRETTI FABIAN", "domicilio": "CARLOS MALDINI 740", "localidad": "2434 ARROYITO", "provincia": "CORDOBA", "telefono": "3576-472917", "ruta": "Ruta Nacional 19"}, {"nombre": "MORALES DARIO", "domicilio": "O. HERRERA", "localidad": "2550 BELL VILLE", "provincia": "CORDOBA", "telefono": "3537444372", "ruta": "Ruta Nacional 9"}, {"nombre": "MOTTURA MARCELO DANIEL", "domicilio": "SAN LORENZO ESQ 12 OCTUBRE", "localidad": "SAN GUILLERMO", "provincia": "SANTA FE", "telefono": "3424303613", "ruta": "Ruta Provincial 23 (Santa Fe)"}, {"nombre": "MUEBLES MODERNOS MELAMINA ( CLAUDIO VERA)", "domicilio": "GRAL SAVIO 703", "localidad": "2400 SAN FRANCISCO", "provincia": "CORDOBA", "telefono": "3564604119", "ruta": "San Francisco"}, {"nombre": "ORELLANO ROBERTO", "domicilio": "GABOTO 375", "localidad": "2400 SAN FRANCISCO", "provincia": "CORDOBA", "telefono": "3564592517", "ruta": "San Francisco"}, {"nombre": "PERRONE FABRICIO", "domicilio": "CELESTINO 107", "localidad": "5943 LASPIUR", "provincia": "CORDOBA", "telefono": "3533459956", "ruta": "Ruta 158"}, {"nombre": "PODEWILS  DARIO", "domicilio": "BV 25 DE MAYO 1059", "localidad": "2451 SAN JORGE", "provincia": "SANTA FE", "telefono": "3406-456306", "ruta": "Ruta Provincial 13 (Santa Fe)"}, {"nombre": "RACCA MATIAS", "domicilio": "CORRIENTES 264", "localidad": "435 PORTEÑA", "provincia": "CORDOBA", "telefono": "3564-652349-504220", "ruta": "Ruta Provincial 1 (Córdoba)"}, {"nombre": "REARTE GUSTAVO", "domicilio": "COLON Y PELEGRINI", "localidad": "2421 MORTEROS", "provincia": "CORDOBA", "telefono": "3562513479", "ruta": "Ruta Provincial 1 (Córdoba)"}, {"nombre": "REARTE MARCELO", "domicilio": "AYACUCHO Y GUEMES", "localidad": "2421 MORTEROS", "provincia": "CORDOBA", "telefono": "3562436984", "ruta": "Ruta Provincial 1 (Córdoba)"}, {"nombre": "REBOLA NORBERTO", "domicilio": "ACCESO RUTA 13", "localidad": "2440 SASTRE", "provincia": "SANTA FE", "telefono": "3406562278", "ruta": "Ruta Provincial 13 (Santa Fe)"}, {"nombre": "RUATTA ARIEL (LALO)", "domicilio": "RUTA 23", "localidad": "2349 SUARDI", "provincia": "SANTA FE", "telefono": "3562444533", "ruta": "Ruta Provincial 23 (Santa Fe)"}, {"nombre": "STICOTTI DIEGO", "domicilio": "25 DE MAYO 419", "localidad": "2426 LA FRANCIA", "provincia": "CORDOBA", "telefono": "3564574179", "ruta": "Ruta Nacional 19"}, {"nombre": "SUPPICICH ARIEL", "domicilio": "GRAL PAZ 1878", "localidad": "2434 ARROYITO", "provincia": "CORDOBA", "telefono": "3576-448054", "ruta": "Ruta Nacional 19"}, {"nombre": "VARAS WALTER", "domicilio": "MAIPU ESQUINA MIRANDA", "localidad": "5967 LUQUE", "provincia": "CORDOBA", "telefono": "3573415588", "ruta": "Ruta Provincial 13 (Córdoba)"}];
 
 
 const uid = (p) => p + "_" + Date.now().toString(36) + Math.random().toString(36).slice(2,8);
@@ -192,16 +192,30 @@ function App(){
         data = seedInicial();
         await storageSet("carpinteros_v1", data);
       } else {
-        // Migración: si hay carpinteros guardados con el campo viejo "telefono"
+        let huboMigracion = false;
+
+        // Migración 1: si hay carpinteros guardados con el campo viejo "telefono"
         // (texto simple) y sin "telefonos" (lista nueva), los convertimos acá
         // para no perder los datos ya cargados.
-        let huboMigracion = false;
-        const carpinterosMigrados = data.carpinteros.map(c=>{
+        let carpinterosMigrados = data.carpinteros.map(c=>{
           if(c.telefonos) return c; // ya está en formato nuevo, no tocar
           huboMigracion = true;
           const { telefono, ...resto } = c;
           return {...resto, telefonos: separarTelefonos(telefono)};
         });
+
+        // Migración 2: los carpinteros de SAN FRANCISCO que quedaron con la
+        // clasificación vieja "Ruta Nacional 19" pasan a su propia zona
+        // "San Francisco", sin tocar el resto de sus datos ni sus eventos.
+        carpinterosMigrados = carpinterosMigrados.map(c=>{
+          const localidad = (c.localidad||"").toUpperCase();
+          if(localidad.includes("SAN FRANCISCO") && c.ruta === "Ruta Nacional 19"){
+            huboMigracion = true;
+            return {...c, ruta: "San Francisco"};
+          }
+          return c;
+        });
+
         if(huboMigracion){
           data = {...data, carpinteros: carpinterosMigrados};
           await storageSet("carpinteros_v1", data);
@@ -285,7 +299,27 @@ function App(){
 
   const localidades = useMemo(()=>{
     if(!db) return [];
-    return ["todas", ...new Set(db.carpinteros.map(c=>c.localidad).filter(Boolean))].sort();
+    const base = filtroRuta==="todas"
+      ? db.carpinteros
+      : db.carpinteros.filter(c=> (c.ruta||"Sin especificar")===filtroRuta);
+    return ["todas", ...new Set(base.map(c=>c.localidad).filter(Boolean))].sort();
+  }, [db, filtroRuta]);
+
+  useEffect(()=>{
+    if(filtroLocalidad!=="todas" && !localidades.includes(filtroLocalidad)){
+      setFiltroLocalidad("todas");
+    }
+  }, [localidades, filtroLocalidad]);
+
+  const comentariosUnicos = useMemo(()=>{
+    if(!db) return [];
+    const set = new Set();
+    db.carpinteros.forEach(c=>{
+      (c.eventos||[]).forEach(ev=>{
+        if(ev.comentario && ev.comentario.trim()) set.add(ev.comentario.trim());
+      });
+    });
+    return [...set].sort((a,b)=> a.localeCompare(b, 'es'));
   }, [db]);
 
   const carpinterosFiltrados = useMemo(()=>{
@@ -350,13 +384,13 @@ function App(){
         </div>
 
         <div style={{display:"flex", gap:8, marginBottom:16, flexWrap:"wrap"}}>
-          <select value={filtroLocalidad} onChange={e=>setFiltroLocalidad(e.target.value)} style={{flex:"1 1 140px", padding:"8px 10px", borderRadius:8, border:"1px solid var(--gris-300)", fontSize:13}}>
-            {localidades.map(l=> <option key={l} value={l}>{l==="todas" ? "Todas las localidades" : l}</option>)}
-          </select>
           <select value={filtroRuta} onChange={e=>setFiltroRuta(e.target.value)} style={{flex:"1 1 140px", padding:"8px 10px", borderRadius:8, border:"1px solid var(--gris-300)", fontSize:13}}>
             <option value="todas">Todas las rutas</option>
             {RUTAS_ACCESO.map(r=> <option key={r} value={r}>{r}</option>)}
             <option value="Sin especificar">Sin especificar</option>
+          </select>
+          <select value={filtroLocalidad} onChange={e=>setFiltroLocalidad(e.target.value)} style={{flex:"1 1 140px", padding:"8px 10px", borderRadius:8, border:"1px solid var(--gris-300)", fontSize:13}}>
+            {localidades.map(l=> <option key={l} value={l}>{l==="todas" ? "Todas las localidades" : l}</option>)}
           </select>
           <select value={orden} onChange={e=>setOrden(e.target.value)} style={{flex:"1 1 140px", padding:"8px 10px", borderRadius:8, border:"1px solid var(--gris-300)", fontSize:13}}>
             <option value="nombre">Nombre (A-Z)</option>
@@ -416,12 +450,19 @@ function App(){
                 </div>
 
                 {ultimoEvento && (
-                  <div style={{marginTop:8, display:"flex", alignItems:"center", gap:6, flexWrap:"wrap"}}>
-                    <span style={{fontSize:10.5, padding:"2px 8px", borderRadius:20, fontWeight:700,
-                      background: colorEvento(ultimoEvento.tipo).bg, color: colorEvento(ultimoEvento.tipo).fg}}>
-                      {TIPOS_EVENTO.find(t=>t.id===ultimoEvento.tipo)?.label || ultimoEvento.tipo}
-                    </span>
-                    <span style={{fontSize:11.5, color:"var(--gris-500)"}}>{fmtFechaCorta(ultimoEvento.fecha)}</span>
+                  <div style={{marginTop:8}}>
+                    <div style={{display:"flex", alignItems:"center", gap:6, flexWrap:"wrap"}}>
+                      <span style={{fontSize:10.5, padding:"2px 8px", borderRadius:20, fontWeight:700,
+                        background: colorEvento(ultimoEvento.tipo).bg, color: colorEvento(ultimoEvento.tipo).fg}}>
+                        {TIPOS_EVENTO.find(t=>t.id===ultimoEvento.tipo)?.label || ultimoEvento.tipo}
+                      </span>
+                      <span style={{fontSize:11.5, color:"var(--gris-500)"}}>{fmtFechaCorta(ultimoEvento.fecha)}</span>
+                    </div>
+                    {ultimoEvento.comentario && (
+                      <div style={{fontSize:12, color:"var(--gris-600)", marginTop:3, fontStyle:"italic"}}>
+                        "{ultimoEvento.comentario}"
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -458,6 +499,7 @@ function App(){
           onAgregar={(ev)=>agregarEvento(carpinteroEventos.id, ev)}
           onEliminar={(evId)=>eliminarEvento(carpinteroEventos.id, evId)}
           onCerrar={()=>setCarpinteroEventos(null)}
+          comentariosPrevios={comentariosUnicos}
         />
       )}
 
@@ -466,6 +508,7 @@ function App(){
           cantidad={seleccionados.size}
           onAplicar={agregarEventoMasivo}
           onCerrar={()=>setModalEventoMasivo(false)}
+          comentariosPrevios={comentariosUnicos}
         />
       )}
 
@@ -558,7 +601,7 @@ function ModalCarpintero({carpintero, onGuardar, onCerrar}){
   );
 }
 
-function ModalEventos({carpintero, onAgregar, onEliminar, onCerrar}){
+function ModalEventos({carpintero, onAgregar, onEliminar, onCerrar, comentariosPrevios}){
   const [tipo, setTipo] = useState(TIPOS_EVENTO[0].id);
   const [comentario, setComentario] = useState("");
   const [fecha, setFecha] = useState(()=>{
@@ -602,7 +645,7 @@ function ModalEventos({carpintero, onAgregar, onEliminar, onCerrar}){
             <input type="date" value={fecha} onChange={e=>setFecha(e.target.value)} style={inputStyle} />
           </Campo>
           <Campo label="Comentario (opcional)">
-            <textarea value={comentario} onChange={e=>setComentario(e.target.value)} rows={2} style={{...inputStyle, resize:"vertical"}} placeholder="Alguna nota sobre este contacto..." />
+            <ComboComentario value={comentario} onChange={setComentario} comentariosPrevios={comentariosPrevios||[]} placeholder="Alguna nota sobre este contacto..." />
           </Campo>
           <button onClick={agregar} style={{width:"100%", padding:"9px", borderRadius:8, border:"none", background:"var(--verde-600)", color:"#fff", fontWeight:600, fontSize:13.5}}>
             + Registrar evento
@@ -642,7 +685,7 @@ function ModalEventos({carpintero, onAgregar, onEliminar, onCerrar}){
   );
 }
 
-function ModalEventoMasivo({cantidad, onAplicar, onCerrar}){
+function ModalEventoMasivo({cantidad, onAplicar, onCerrar, comentariosPrevios}){
   const [tipo, setTipo] = useState(TIPOS_EVENTO[0].id);
   const [comentario, setComentario] = useState("");
   const [fecha, setFecha] = useState(()=>{
@@ -681,7 +724,7 @@ function ModalEventoMasivo({cantidad, onAplicar, onCerrar}){
           <input type="date" value={fecha} onChange={e=>setFecha(e.target.value)} style={inputStyle} />
         </Campo>
         <Campo label="Comentario (opcional)">
-          <textarea value={comentario} onChange={e=>setComentario(e.target.value)} rows={2} style={{...inputStyle, resize:"vertical"}} placeholder="Ej: Aviso de viaje a la zona..." />
+          <ComboComentario value={comentario} onChange={setComentario} comentariosPrevios={comentariosPrevios||[]} placeholder="Ej: Aviso de viaje a la zona..." />
         </Campo>
 
         <div style={{display:"flex", gap:10, marginTop:18}}>
@@ -692,6 +735,48 @@ function ModalEventoMasivo({cantidad, onAplicar, onCerrar}){
         </div>
       </div>
     </div>
+  );
+}
+
+// Combo para elegir un comentario ya usado antes, o escribir uno nuevo.
+// value/onChange funcionan como un input de texto normal para quien lo usa por fuera.
+const NUEVA_NOTA = "__nueva_nota__";
+
+function ComboComentario({value, onChange, comentariosPrevios, placeholder}){
+  const [modoNuevo, setModoNuevo] = useState(!value || !comentariosPrevios.includes(value));
+
+  function manejarSelect(e){
+    const v = e.target.value;
+    if(v === NUEVA_NOTA){
+      setModoNuevo(true);
+      onChange("");
+    } else {
+      setModoNuevo(false);
+      onChange(v);
+    }
+  }
+
+  if(comentariosPrevios.length === 0 || modoNuevo){
+    return (
+      <div>
+        <textarea value={value} onChange={e=>onChange(e.target.value)} rows={2}
+          style={{...inputStyle, resize:"vertical"}} placeholder={placeholder} />
+        {comentariosPrevios.length > 0 && (
+          <button type="button" onClick={()=>setModoNuevo(false)}
+            style={{fontSize:12, color:"var(--azul-600)", background:"none", border:"none", padding:"4px 0 0 0"}}>
+            ← Elegir una nota ya usada
+          </button>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <select value={value} onChange={manejarSelect} style={inputStyle}>
+      <option value="">Sin comentario</option>
+      {comentariosPrevios.map(c=> <option key={c} value={c}>{c}</option>)}
+      <option value={NUEVA_NOTA}>✎ Escribir nueva nota...</option>
+    </select>
   );
 }
 
