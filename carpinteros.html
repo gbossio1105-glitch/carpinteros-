@@ -91,6 +91,7 @@ const TIPOS_EVENTO = [
 ];
 
 const RUTAS_ACCESO = [
+  "San Francisco",
   "Ruta Nacional 19",
   "Ruta Provincial 1 (Córdoba)",
   "Ruta Provincial 17",
@@ -103,6 +104,38 @@ const RUTAS_ACCESO = [
   "Ruta Nacional 95",
   "Sin clasificar",
 ];
+
+// Mensajes de primer contacto: se envían como mensajes SEPARADOS (uno por vez,
+// como burbujas de chat independientes), no como un solo texto largo.
+const MENSAJES_PRIMER_CONTACTO = [
+  {tipo:"whatsapp", texto:"Me pasaron el número"},
+  {tipo:"whatsapp", texto:"Me comunico de parte de *SB Herrajes* de Sergio BOSSIO (Ex socio de MyF ACCESORIOS) estamos ubicados en Juan de Garay 2147, San Francisco, Córdoba."},
+  {tipo:"whatsapp", texto:"Nos especializamos en la venta mayorista de herrajes para carpintería de madera y de aluminio, contamos con más de 2000 ítems entre accesorios y herramientas — todo con stock disponible."},
+  {tipo:"whatsapp", texto:"Te puedo pasar una lista de precios actualizada con los productos más usados en la línea carpintería de madera??"},
+];
+
+// Mensajes de segundo contacto: se usan una vez que el carpintero ya respondió
+// al primer contacto. El mensaje del PDF es un recordatorio (no tiene botón de
+// WhatsApp porque wa.me no permite adjuntar archivos automáticamente).
+const MENSAJES_SEGUNDO_CONTACTO = [
+  {tipo:"recordatorio", texto:"Enviá el PDF de la lista de precios (con el 10% de descuento ya aplicado) manualmente desde WhatsApp."},
+  {tipo:"whatsapp", texto:"También disponemos de distintos tipos de accesorios de la marca Bronzen. ¿Querés conocer más de lo que trabajamos?"},
+];
+
+// Mensajes de tercer contacto: se usan cuando el carpintero responde que sí le
+// interesa conocer más sobre los productos Bronzen.
+const MENSAJES_TERCER_CONTACTO = [
+  {tipo:"recordatorio", texto:"Enviá el PDF del catálogo Bronzen manualmente desde WhatsApp."},
+  {tipo:"whatsapp", texto:"Cualquier consulta o pedido quedo a su disposición, o si quiere visitarnos en nuestro salón comercial estamos de lunes a viernes de 8 a 18 hs."},
+  {tipo:"whatsapp", texto:"Saludos"},
+];
+
+function saludoSegunHora(){
+  const hora = new Date().getHours();
+  if(hora >= 6 && hora < 12) return "Buenos días";
+  if(hora >= 12 && hora < 19) return "Buenas tardes";
+  return "Buenas noches";
+}
 
 function colorEvento(tipoId){
   const t = TIPOS_EVENTO.find(x=>x.id===tipoId);
@@ -175,6 +208,7 @@ function App(){
   const [modoSeleccion, setModoSeleccion] = useState(false);
   const [seleccionados, setSeleccionados] = useState(()=> new Set());
   const [modalEventoMasivo, setModalEventoMasivo] = useState(false);
+  const [carpinteroPrimerContacto, setCarpinteroPrimerContacto] = useState(null);
 
   const mostrarToast = useCallback((msg)=>{ setToast({msg, id:Date.now()}); }, []);
 
@@ -466,7 +500,12 @@ function App(){
                   </div>
                 )}
 
-                <div style={{display:"flex", gap:16, marginTop:10, paddingTop:10, borderTop:"1px solid var(--gris-100)", alignItems:"center"}}>
+                <div style={{display:"flex", gap:16, marginTop:10, paddingTop:10, borderTop:"1px solid var(--gris-100)", alignItems:"center", flexWrap:"wrap"}}>
+                  {(c.telefonos||[]).length>0 && (
+                    <button onClick={()=>setCarpinteroPrimerContacto(c)} style={{fontSize:13, color:"var(--verde-700)", background:"none", border:"none", padding:0, fontWeight:600}}>
+                      💬 Primer contacto
+                    </button>
+                  )}
                   <button onClick={()=>setCarpinteroEventos(c)} style={{fontSize:13, color:"var(--verde-600)", background:"none", border:"none", padding:0, fontWeight:600}}>
                     Seguimiento {(c.eventos||[]).length>0 && `(${(c.eventos||[]).length})`}
                   </button>
@@ -509,6 +548,13 @@ function App(){
           onAplicar={agregarEventoMasivo}
           onCerrar={()=>setModalEventoMasivo(false)}
           comentariosPrevios={comentariosUnicos}
+        />
+      )}
+
+      {carpinteroPrimerContacto && (
+        <ModalPrimerContacto
+          carpintero={carpinteroPrimerContacto}
+          onCerrar={()=>setCarpinteroPrimerContacto(null)}
         />
       )}
 
@@ -732,6 +778,103 @@ function ModalEventoMasivo({cantidad, onAplicar, onCerrar, comentariosPrevios}){
           <button onClick={aplicar} style={{flex:1, padding:"10px", borderRadius:8, border:"none", background:"var(--verde-600)", color:"#fff", fontWeight:600}}>
             Aplicar a {cantidad}
           </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ModalPrimerContacto({carpintero, onCerrar}){
+  const telefonos = carpintero.telefonos || [];
+  const [telefonoElegido, setTelefonoElegido] = useState(telefonos[0]?.id || "");
+  const [enviados, setEnviados] = useState(()=> new Set());
+  const [etapa, setEtapa] = useState("primero"); // "primero" | "segundo" | "tercero"
+
+  const telSeleccionado = telefonos.find(t=>t.id===telefonoElegido) || telefonos[0];
+
+  // El saludo se calcula una sola vez al abrir el modal (no se recalcula en cada
+  // render), combinado con los mensajes fijos de siempre.
+  const mensajesPrimero = useMemo(()=> [
+    {tipo:"whatsapp", texto: saludoSegunHora()},
+    ...MENSAJES_PRIMER_CONTACTO,
+  ], []);
+
+  const mensajes = etapa==="primero" ? mensajesPrimero
+    : etapa==="segundo" ? MENSAJES_SEGUNDO_CONTACTO
+    : MENSAJES_TERCER_CONTACTO;
+
+  function abrirMensaje(index, texto){
+    if(!telSeleccionado) return;
+    const numero = telSeleccionado.numero.replace(/[^0-9]/g,"");
+    const url = `https://wa.me/54${numero}?text=${encodeURIComponent(texto)}`;
+    window.open(url, "_blank", "noopener");
+    setEnviados(prev=> new Set(prev).add(etapa+"_"+index));
+  }
+
+  return (
+    <div className="modal-overlay" style={{position:"fixed", inset:0, background:"rgba(10,20,35,0.5)", display:"flex", alignItems:"center", justifyContent:"center", zIndex:70, padding:16}} onClick={onCerrar}>
+      <div className="modal-box" style={{background:"#fff", borderRadius:14, padding:"24px 22px", width:480, maxWidth:"100%", maxHeight:"90vh", overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
+        <h3 style={{marginTop:0, fontSize:17, fontWeight:700, marginBottom:2}}>Mensajes de contacto</h3>
+        <p style={{fontSize:13, color:"var(--gris-500)", marginTop:0, marginBottom:16}}>{carpintero.nombre}</p>
+
+        <div style={{display:"flex", gap:6, marginBottom:16, borderBottom:"1px solid var(--gris-200)", flexWrap:"wrap"}}>
+          <button onClick={()=>setEtapa("primero")}
+            style={{flex:"1 1 auto", padding:"9px 4px", border:"none", background:"none", fontSize:12.5, fontWeight:600,
+              color: etapa==="primero" ? "var(--azul-600)" : "var(--gris-500)",
+              borderBottom: etapa==="primero" ? "2px solid var(--azul-600)" : "2px solid transparent"}}>
+            1️⃣ Primer contacto
+          </button>
+          <button onClick={()=>setEtapa("segundo")}
+            style={{flex:"1 1 auto", padding:"9px 4px", border:"none", background:"none", fontSize:12.5, fontWeight:600,
+              color: etapa==="segundo" ? "var(--azul-600)" : "var(--gris-500)",
+              borderBottom: etapa==="segundo" ? "2px solid var(--azul-600)" : "2px solid transparent"}}>
+            2️⃣ Cuando responda
+          </button>
+          <button onClick={()=>setEtapa("tercero")}
+            style={{flex:"1 1 auto", padding:"9px 4px", border:"none", background:"none", fontSize:12.5, fontWeight:600,
+              color: etapa==="tercero" ? "var(--azul-600)" : "var(--gris-500)",
+              borderBottom: etapa==="tercero" ? "2px solid var(--azul-600)" : "2px solid transparent"}}>
+            3️⃣ Le interesa Bronzen
+          </button>
+        </div>
+
+        {telefonos.length > 1 && (
+          <div style={{marginBottom:16}}>
+            <label style={{display:"block", fontSize:12.5, color:"var(--gris-700)", marginBottom:5, fontWeight:600}}>Enviar al teléfono:</label>
+            <select value={telefonoElegido} onChange={e=>setTelefonoElegido(e.target.value)} style={inputStyle}>
+              {telefonos.map(t=> <option key={t.id} value={t.id}>{t.nombre ? `${t.nombre} — ${t.numero}` : t.numero}</option>)}
+            </select>
+          </div>
+        )}
+
+        <p style={{fontSize:12.5, color:"var(--gris-500)", marginBottom:14}}>
+          Tocá cada mensaje para abrirlo en WhatsApp ya cargado. Revisalo y tocá enviar allá. Después volvé acá para el siguiente.
+        </p>
+
+        <div style={{display:"flex", flexDirection:"column", gap:10}}>
+          {mensajes.map((m, i)=>{
+            const key = etapa+"_"+i;
+            const esRecordatorio = m.tipo === "recordatorio";
+            return (
+              <button key={key} onClick={()=> !esRecordatorio && abrirMensaje(i, m.texto)}
+                style={{textAlign:"left", padding:"12px 14px", borderRadius:10,
+                  border: esRecordatorio ? "1px dashed var(--ambar-600)" : (enviados.has(key) ? "1px solid var(--verde-500)" : "1px solid var(--gris-200)"),
+                  background: esRecordatorio ? "var(--ambar-100)" : (enviados.has(key) ? "var(--verde-50)" : "var(--gris-50)"),
+                  fontSize:13.5, lineHeight:1.4, color:"var(--gris-800)", cursor: esRecordatorio ? "default" : "pointer"}}>
+                <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:4}}>
+                  <span style={{fontSize:11, fontWeight:700, color: esRecordatorio ? "var(--ambar-600)" : "var(--verde-700)"}}>
+                    {esRecordatorio ? "📎 Recordatorio" : `Mensaje ${i+1} de ${mensajes.length}`}
+                  </span>
+                  {!esRecordatorio && enviados.has(key) && <span style={{fontSize:11, color:"var(--verde-600)", fontWeight:700}}>✓ Enviado</span>}
+                </div>
+                {m.texto}
+              </button>
+            );
+          })}
+        </div>
+
+        <div style={{marginTop:18}}>
+          <button onClick={onCerrar} style={{width:"100%", padding:"10px", borderRadius:8, border:"1px solid var(--gris-300)", background:"#fff"}}>Cerrar</button>
         </div>
       </div>
     </div>
