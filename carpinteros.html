@@ -81,13 +81,11 @@ async function storageSet(key, value){
 }
 
 const TIPOS_EVENTO = [
-  {id:"llamado", label:"Llamado", color:"azul"},
   {id:"whatsapp", label:"WhatsApp enviado", color:"verde"},
-  {id:"lista_enviada", label:"Lista de precios enviada", color:"verde"},
   {id:"compro", label:"Compró", color:"verde"},
+  {id:"pidio_presupuesto", label:"Pidió presupuesto", color:"azul"},
+  {id:"contesto_cordial", label:"Contestó cordialmente", color:"azul"},
   {id:"no_contesto", label:"No contestó", color:"ambar"},
-  {id:"no_intereso", label:"No le interesó", color:"rojo"},
-  {id:"a_seguir", label:"A seguir", color:"ambar"},
 ];
 
 const RUTAS_ACCESO = [
@@ -135,6 +133,21 @@ function saludoSegunHora(){
   if(hora >= 6 && hora < 12) return "Buenos días";
   if(hora >= 12 && hora < 19) return "Buenas tardes";
   return "Buenas noches";
+}
+
+// Determina la "etapa de contacto" de un carpintero según el comentario del
+// evento más reciente (los que se registran automáticamente al enviar mensajes
+// desde Primer contacto empiezan con "Primer/Segundo/Tercer contacto —").
+const ETAPAS_CONTACTO = ["Primer contacto", "Segundo contacto", "Tercer contacto"];
+
+function etapaContactoDe(carpintero){
+  const eventos = carpintero.eventos || [];
+  for(const ev of eventos){ // ya vienen ordenados con el más reciente primero
+    if(!ev.comentario) continue;
+    const encontrada = ETAPAS_CONTACTO.find(e => ev.comentario.startsWith(e));
+    if(encontrada) return encontrada;
+  }
+  return "Sin contacto";
 }
 
 function colorEvento(tipoId){
@@ -203,6 +216,7 @@ function App(){
   const [busqueda, setBusqueda] = useState("");
   const [filtroLocalidad, setFiltroLocalidad] = useState("todas");
   const [filtroRuta, setFiltroRuta] = useState("todas");
+  const [filtroEtapaContacto, setFiltroEtapaContacto] = useState("todas");
   const [orden, setOrden] = useState("nombre");
   const [toast, setToast] = useState(null);
   const [modoSeleccion, setModoSeleccion] = useState(false);
@@ -361,6 +375,7 @@ function App(){
     let lista = db.carpinteros.filter(c=>{
       if(filtroLocalidad!=="todas" && c.localidad!==filtroLocalidad) return false;
       if(filtroRuta!=="todas" && (c.ruta||"Sin especificar")!==filtroRuta) return false;
+      if(filtroEtapaContacto!=="todas" && etapaContactoDe(c)!==filtroEtapaContacto) return false;
       if(busqueda){
         const q = busqueda.toLowerCase();
         const telefonosTexto = (c.telefonos||[]).map(t=>t.numero+" "+(t.nombre||"")).join(" ").toLowerCase();
@@ -377,7 +392,7 @@ function App(){
       return fb.localeCompare(fa);
     });
     return lista;
-  }, [db, busqueda, filtroLocalidad, filtroRuta, orden]);
+  }, [db, busqueda, filtroLocalidad, filtroRuta, filtroEtapaContacto, orden]);
 
   if(cargando || !db){
     return (
@@ -425,6 +440,13 @@ function App(){
           </select>
           <select value={filtroLocalidad} onChange={e=>setFiltroLocalidad(e.target.value)} style={{flex:"1 1 140px", padding:"8px 10px", borderRadius:8, border:"1px solid var(--gris-300)", fontSize:13}}>
             {localidades.map(l=> <option key={l} value={l}>{l==="todas" ? "Todas las localidades" : l}</option>)}
+          </select>
+          <select value={filtroEtapaContacto} onChange={e=>setFiltroEtapaContacto(e.target.value)} style={{flex:"1 1 140px", padding:"8px 10px", borderRadius:8, border:"1px solid var(--gris-300)", fontSize:13}}>
+            <option value="todas">Todos los contactos</option>
+            <option value="Sin contacto">Sin contacto</option>
+            <option value="Primer contacto">Primer contacto</option>
+            <option value="Segundo contacto">Segundo contacto</option>
+            <option value="Tercer contacto">Tercer contacto</option>
           </select>
           <select value={orden} onChange={e=>setOrden(e.target.value)} style={{flex:"1 1 140px", padding:"8px 10px", borderRadius:8, border:"1px solid var(--gris-300)", fontSize:13}}>
             <option value="nombre">Nombre (A-Z)</option>
@@ -555,6 +577,7 @@ function App(){
         <ModalPrimerContacto
           carpintero={carpinteroPrimerContacto}
           onCerrar={()=>setCarpinteroPrimerContacto(null)}
+          onRegistrarEnvio={(evento)=>agregarEvento(carpinteroPrimerContacto.id, evento)}
         />
       )}
 
@@ -784,7 +807,7 @@ function ModalEventoMasivo({cantidad, onAplicar, onCerrar, comentariosPrevios}){
   );
 }
 
-function ModalPrimerContacto({carpintero, onCerrar}){
+function ModalPrimerContacto({carpintero, onCerrar, onRegistrarEnvio}){
   const telefonos = carpintero.telefonos || [];
   const [telefonoElegido, setTelefonoElegido] = useState(telefonos[0]?.id || "");
   const [enviados, setEnviados] = useState(()=> new Set());
@@ -803,12 +826,26 @@ function ModalPrimerContacto({carpintero, onCerrar}){
     : etapa==="segundo" ? MENSAJES_SEGUNDO_CONTACTO
     : MENSAJES_TERCER_CONTACTO;
 
+  const NOMBRE_ETAPA = {
+    primero: "Primer contacto",
+    segundo: "Segundo contacto",
+    tercero: "Tercer contacto",
+  };
+
   function abrirMensaje(index, texto){
     if(!telSeleccionado) return;
     const numero = telSeleccionado.numero.replace(/[^0-9]/g,"");
     const url = `https://wa.me/54${numero}?text=${encodeURIComponent(texto)}`;
     window.open(url, "_blank", "noopener");
     setEnviados(prev=> new Set(prev).add(etapa+"_"+index));
+    if(onRegistrarEnvio){
+      onRegistrarEnvio({
+        id: uid("ev"),
+        fecha: new Date().toISOString(),
+        tipo: "whatsapp",
+        comentario: `${NOMBRE_ETAPA[etapa]} — Mensaje ${index+1} de ${mensajes.length}`,
+      });
+    }
   }
 
   return (
