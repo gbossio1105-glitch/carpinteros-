@@ -1,0 +1,1290 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Grupos Marketplace — AB Accesorios</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Grupos MKP">
+<meta name="theme-color" content="#0a2540">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+<style>
+  :root{
+    --azul-900:#0a2540; --azul-800:#0e3661; --azul-700:#134a86; --azul-600:#1a5fa8;
+    --azul-500:#2b7bd1; --azul-100:#e5f0fb; --azul-50:#f2f8fd;
+    --gris-900:#1c2430; --gris-700:#48505c; --gris-500:#7a8290; --gris-300:#cdd3db;
+    --gris-100:#eef1f5; --gris-50:#f7f9fb;
+    --verde-600:#1c8a5b; --verde-100:#e2f5ec;
+    --rojo-600:#c23b3b; --rojo-100:#fbe8e8;
+    --ambar-600:#b8790f; --ambar-100:#fdf1de;
+    --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html{-webkit-text-size-adjust:100%;}
+  body{margin:0; font-family:var(--font-sans); background:var(--gris-50); color:var(--gris-900); overscroll-behavior-y:contain;}
+  ::-webkit-scrollbar{width:8px; height:8px;}
+  ::-webkit-scrollbar-thumb{background:var(--gris-300); border-radius:4px;}
+  button{font-family:inherit; cursor:pointer; touch-action:manipulation;}
+  input, select, textarea{font-family:inherit; font-size:16px;}
+  #root{min-height:100vh; min-height:100dvh;}
+  @supports (padding: max(0px)){
+    body{ padding-left: env(safe-area-inset-left); padding-right: env(safe-area-inset-right); }
+  }
+  @media (max-width:600px){
+    .modal-overlay{ align-items:flex-end !important; padding:0 !important; }
+    .modal-box{ padding:18px 16px !important; max-height:94vh !important; max-height:94dvh !important; border-radius:16px 16px 0 0 !important; width:100% !important; }
+    .fila-campos{ flex-direction:column !important; gap:0 !important; }
+    .fila-campos > div{ margin-bottom:14px; }
+  }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel" data-presets="react">
+
+const { useState, useEffect, useMemo, useCallback } = React;
+
+// ⚠️ API key de Anthropic — necesaria para que "Leer datos del flyer" funcione
+// fuera de Claude.ai (por ejemplo al abrir este archivo en Documents/iPhone).
+// Consíguela en https://console.anthropic.com/settings/keys
+// Si la dejás vacía, el botón de lectura automática se desactiva y hay que
+// cargar los datos del producto a mano (como siempre funcionó esta app).
+const ANTHROPIC_API_KEY = "";
+
+async function leerFlyerConIA(imagenBase64, mediaType){
+  if(!ANTHROPIC_API_KEY){
+    throw new Error("Falta configurar la API key de Anthropic en el código (ANTHROPIC_API_KEY).");
+  }
+  const prompt = `Mirá este flyer publicitario de un producto de ferretería/herrajes y devolveme SOLO un JSON (sin texto adicional, sin backticks de markdown) con esta forma exacta:
+{"nombre":"","modelo":"","precio":"","variantes":"","categoria":"","estado":"Nuevo","caracteristicas":["","","",""]}
+
+Reglas:
+- "nombre": nombre del producto sin el código de modelo (ej: "Manija Doble Balancín").
+- "modelo": el código de modelo si aparece (ej: "FA-430"), o "" si no hay.
+- "precio": solo números y puntos de miles, sin "$" (ej: "10.500"), o "" si no aparece.
+- "variantes": colores/variantes disponibles con sus códigos si los hay, separados por " / " (ej: "Blanco (FA-430-B) / Negro (FA-430-N)"), o "" si no aplica.
+- "categoria": una categoría corta y genérica de ferretería (ej: "Herrajes", "Herramientas", "Aluminio"), tu mejor estimación.
+- "estado": casi siempre "Nuevo" salvo que el flyer diga lo contrario.
+- "caracteristicas": hasta 4 frases cortas tomadas de los ítems o bullets del flyer (ej: "Material: Aluminio", "Incluye cerradura y varilla"). Si hay menos de 4, dejá las restantes como "".`;
+
+  const response = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-api-key": ANTHROPIC_API_KEY,
+      "anthropic-version": "2023-06-01",
+      "anthropic-dangerous-direct-browser-access": "true"
+    },
+    body: JSON.stringify({
+      model: "claude-sonnet-4-6",
+      max_tokens: 500,
+      messages: [{
+        role: "user",
+        content: [
+          { type: "image", source: { type: "base64", media_type: mediaType, data: imagenBase64 } },
+          { type: "text", text: prompt }
+        ]
+      }]
+    })
+  });
+
+  if(!response.ok){
+    const errText = await response.text();
+    throw new Error(`Error de la API (${response.status}): ${errText.slice(0,200)}`);
+  }
+
+  const data = await response.json();
+  const textoRespuesta = (data.content || []).filter(b=>b.type==="text").map(b=>b.text).join("");
+  const limpio = textoRespuesta.replace(/```json|```/g, "").trim();
+  return JSON.parse(limpio);
+}
+
+const SEED_GRUPOS = [{"nombre": "La Ganga, San Francisco, Córdoba", "zona": "San Francisco", "prioridad": 1, "tipoPublicacion": "A", "miembros": 16539, "notas": ""}, {"nombre": "SAN FRANCISCO REPARACIONES-INSTALACIONES", "zona": "San Francisco", "prioridad": 2, "tipoPublicacion": "A", "miembros": 14115, "notas": ""}, {"nombre": "compra y venta San Francisco y zona", "zona": "San Francisco", "prioridad": 1, "tipoPublicacion": "A", "miembros": 4528, "notas": ""}, {"nombre": "COMPRA Y VENTA FRONTERA, SAN FRANCISCO Y LA REGIÓN Paseo de compras", "zona": "San Francisco / Frontera", "prioridad": 1, "tipoPublicacion": "A", "miembros": 5337, "notas": ""}, {"nombre": "COMPRA y VENTA San Francisco y zona", "zona": "San Francisco", "prioridad": 1, "tipoPublicacion": "A", "miembros": 1702, "notas": ""}, {"nombre": "Locas Por Las Ofertas De Porteña Córdoba Argentina", "zona": "Porteña", "prioridad": 3, "tipoPublicacion": "A", "miembros": 30518, "notas": ""}, {"nombre": "compra libre..!frontera y San Francisco..!", "zona": "San Francisco / Frontera", "prioridad": 2, "tipoPublicacion": "A", "miembros": 5760, "notas": ""}, {"nombre": "se vende de todo San Frsmancisco, Frontera y zona", "zona": "San Francisco / Frontera", "prioridad": 2, "tipoPublicacion": "A", "miembros": 625, "notas": ""}, {"nombre": "clasificados san francisco cordoba y frontera santa fe", "zona": "San Francisco / Frontera / Santa Fe", "prioridad": 2, "tipoPublicacion": "A", "miembros": 32914, "notas": ""}, {"nombre": "MERCADO LIBRE SAN FRANCISCO", "zona": "San Francisco", "prioridad": 1, "tipoPublicacion": "A", "miembros": 5084, "notas": ""}, {"nombre": "Vendiendo y comprando", "zona": "", "prioridad": 3, "tipoPublicacion": "A", "miembros": 29877, "notas": ""}, {"nombre": "Trueque, Compras y Ventas. (Brinkmann, Morteros y Porteña)", "zona": "Brinkmann / Morteros / Porteña", "prioridad": 3, "tipoPublicacion": "A", "miembros": 20383, "notas": ""}, {"nombre": "Compra - venta. San Francisco-Córdoba", "zona": "San Francisco", "prioridad": 1, "tipoPublicacion": "A", "miembros": 8763, "notas": ""}, {"nombre": "🇦🇷 SAN FRANCISCO - (CÓRDOBA) -- COMPRA Y VENDE🇦🇷", "zona": "San Francisco", "prioridad": 2, "tipoPublicacion": "A", "miembros": 14304, "notas": ""}, {"nombre": "VENDE LO QUE QUIERAS- SAN FRANCISCO", "zona": "San Francisco", "prioridad": 2, "tipoPublicacion": "A", "miembros": 24669, "notas": ""}, {"nombre": "COMPRAVENTA ON LINE SAN FRANCISCO", "zona": "San Francisco", "prioridad": 2, "tipoPublicacion": "A", "miembros": 9238, "notas": ""}, {"nombre": "Clasifica2.com \"SAN FRANCISCO\"", "zona": "San Francisco", "prioridad": 2, "tipoPublicacion": "A", "miembros": 10879, "notas": ""}, {"nombre": "VENTA Y COMPRA. SAN FCO Y ZONA! TODO CON PRECIO", "zona": "San Francisco", "prioridad": 1, "tipoPublicacion": "A", "miembros": 2606, "notas": ""}, {"nombre": "Ventas Freyre, Porteña y San Francisco (Córdoba)", "zona": "Freyre / Porteña / San Francisco", "prioridad": 2, "tipoPublicacion": "A", "miembros": 5594, "notas": ""}, {"nombre": "CLASIFICADOS FREYRE, PORTEÑA Y SAN FRANCISCO (CÓRDOBA)", "zona": "Freyre / Porteña / San Francisco", "prioridad": 2, "tipoPublicacion": "A", "miembros": 1971, "notas": ""}, {"nombre": "Compra - Venta - Freyre Y Zona", "zona": "Freyre", "prioridad": 3, "tipoPublicacion": "A", "miembros": 13680, "notas": ""}, {"nombre": "Vendé hasta tu suegra!!! San Francisco y zona", "zona": "San Francisco", "prioridad": 2, "tipoPublicacion": "A", "miembros": 8925, "notas": ""}, {"nombre": "VENDELO YA!! SAN FRANCISCO", "zona": "San Francisco", "prioridad": 1, "tipoPublicacion": "A", "miembros": 3065, "notas": ""}, {"nombre": "Mercado Online San Francisco..!!", "zona": "San Francisco", "prioridad": 2, "tipoPublicacion": "A", "miembros": 5753, "notas": ""}, {"nombre": "\"FOR SALE\" SAN FRANCISCO Y LA REGIÓN", "zona": "San Francisco", "prioridad": 1, "tipoPublicacion": "A", "miembros": 12136, "notas": ""}, {"nombre": "san francisco, VENDE YA!!!", "zona": "San Francisco", "prioridad": 2, "tipoPublicacion": "A", "miembros": 4343, "notas": ""}, {"nombre": "Gangas San Fco, Frontera y Zona", "zona": "San Francisco / Frontera", "prioridad": 1, "tipoPublicacion": "A", "miembros": 5719, "notas": ""}, {"nombre": "COMPRAS VENTAS Y MÁS!!", "zona": "", "prioridad": 3, "tipoPublicacion": "A", "miembros": 3711, "notas": ""}, {"nombre": "usados san francisco y zona", "zona": "San Francisco", "prioridad": 2, "tipoPublicacion": "A", "miembros": 10422, "notas": ""}, {"nombre": "SAN FRANCISCO Y ALREDEDORES", "zona": "San Francisco", "prioridad": 1, "tipoPublicacion": "A", "miembros": 2833, "notas": ""}, {"nombre": "Vende San Francisco y Zona", "zona": "San Francisco", "prioridad": 2, "tipoPublicacion": "A", "miembros": 2398, "notas": ""}, {"nombre": "MERCADOLIBRE SAN FRANCISCO", "zona": "San Francisco", "prioridad": 2, "tipoPublicacion": "A", "miembros": 1295, "notas": ""}, {"nombre": "DE TODO UN POCO SAN FRANCISCO", "zona": "San Francisco", "prioridad": 2, "tipoPublicacion": "A", "miembros": 780, "notas": ""}, {"nombre": "COMPRA y VENTA SAN FRANCISCO...", "zona": "San Francisco", "prioridad": 2, "tipoPublicacion": "A", "miembros": 1702, "notas": ""}, {"nombre": "SAN FRANCISCO CÓRDOBA", "zona": "San Francisco", "prioridad": 2, "tipoPublicacion": "A", "miembros": 3080, "notas": ""}, {"nombre": "Compra vende truequea San Francisco", "zona": "San Francisco", "prioridad": 3, "tipoPublicacion": "A", "miembros": 1856, "notas": ""}, {"nombre": "San Francisco vende!", "zona": "San Francisco", "prioridad": 2, "tipoPublicacion": "A", "miembros": 4343, "notas": ""}, {"nombre": "San Francisco y Zona de todo un poco", "zona": "San Francisco", "prioridad": 3, "tipoPublicacion": "A", "miembros": 3679, "notas": ""}, {"nombre": "Vende,lo q ya no usas,San Francisco y Frontera.", "zona": "San Francisco / Frontera", "prioridad": 2, "tipoPublicacion": "A", "miembros": 3460, "notas": ""}, {"nombre": "OFERTAS SAN FRANCISCO", "zona": "San Francisco", "prioridad": 1, "tipoPublicacion": "A", "miembros": 3429, "notas": ""}, {"nombre": "compra y venta San Francisco y frontera", "zona": "San Francisco / Frontera", "prioridad": 2, "tipoPublicacion": "A", "miembros": 3373, "notas": ""}, {"nombre": "Mercado Libre San Francisco", "zona": "San Francisco", "prioridad": 2, "tipoPublicacion": "A", "miembros": 2510, "notas": ""}, {"nombre": "trueque san francisco y frontera", "zona": "San Francisco / Frontera", "prioridad": 3, "notas": "Grupo de trueque, no venta con precio", "tipoPublicacion": "A", "miembros": 5295}, {"nombre": "COMPRAVENTA ALTRO QUE ON LINE SANFRANCISCO Y REGION", "zona": "San Francisco", "prioridad": 3, "tipoPublicacion": "A", "miembros": 1851, "notas": ""}, {"nombre": "TRUEQUE SAN FRANCISCO TODO X TODO", "zona": "San Francisco", "prioridad": 3, "notas": "Grupo de trueque, no venta con precio", "tipoPublicacion": "A", "miembros": 11931}, {"nombre": "TRUEQUE TRUEQUISIMO", "zona": "", "prioridad": 3, "notas": "Grupo de trueque, no venta con precio", "tipoPublicacion": "A", "miembros": 2401}, {"nombre": "TRUEQUE SAN FRANCISCO TODO POR TODO!! 1", "zona": "San Francisco", "prioridad": 3, "notas": "Grupo de trueque, no venta con precio", "tipoPublicacion": "A", "miembros": 14624}, {"nombre": "COMPRA Y VENTA SAN PANCHO", "zona": "San Pancho", "prioridad": 3, "tipoPublicacion": "A", "miembros": 5822, "notas": ""}, {"nombre": "Trabajos y Empleos en San Francisco y Zona (Córdoba - Argentina)", "zona": "San Francisco", "prioridad": 3, "notas": "Grupo de empleo, no de venta de productos", "tipoPublicacion": "A", "miembros": 6791}, {"nombre": "SOLO-TRUEQUE", "zona": "", "prioridad": 3, "notas": "Grupo de trueque, no venta con precio", "tipoPublicacion": "A", "miembros": 8346}, {"nombre": "Trueque San Francisco Cordoba Argentina todo x todo y más!!!!", "zona": "San Francisco", "prioridad": 3, "notas": "Grupo de trueque, no venta con precio", "tipoPublicacion": "A", "miembros": 6144}, {"nombre": "TRUEQUE SAN FRANCISCO Y FRONTERA!", "zona": "San Francisco / Frontera", "prioridad": 3, "notas": "Grupo de trueque, no venta con precio", "tipoPublicacion": "A", "miembros": 5066}, {"nombre": "#*SAN FRANCISCO Y ZONA: COMPRÁ, VENDÉ, PERMUTÁ LO QUE QUIERAS*#", "zona": "San Francisco", "prioridad": 2, "tipoPublicacion": "A", "miembros": 21042, "notas": ""}, {"nombre": "trueque por trueque san Francisco", "zona": "San Francisco", "prioridad": 3, "notas": "Grupo de trueque, no venta con precio", "tipoPublicacion": "A", "miembros": 6271}, {"nombre": "Trueque de San Francisco Córdoba", "zona": "San Francisco", "prioridad": 3, "notas": "Grupo de trueque, no venta con precio", "tipoPublicacion": "A", "miembros": 19408}, {"nombre": "Trueque San Francisco Córdoba y frontera santa fe", "zona": "San Francisco / Frontera / Santa Fe", "prioridad": 3, "notas": "Grupo de trueque, no venta con precio", "tipoPublicacion": "A", "miembros": 7145}, {"nombre": "NUEVO COMPRA Y VENTA SAN JORGE", "zona": "San Jorge", "prioridad": 3, "tipoPublicacion": "A", "miembros": 19835, "notas": ""}, {"nombre": "Antiguedades San Francisco", "zona": "San Francisco", "prioridad": 3, "notas": "Solo antiguedades, no accesorios de carpinteria", "tipoPublicacion": "A", "miembros": 3303}, {"nombre": "Compra y venta-Devoto cordoba- Nuevo grupo.", "zona": "Devoto", "prioridad": 3, "tipoPublicacion": "A", "miembros": 8552, "notas": ""}, {"nombre": "trueque y venta san francisco cordoba", "zona": "San Francisco", "prioridad": 3, "notas": "Grupo de trueque, no venta con precio", "tipoPublicacion": "A", "miembros": 2060}, {"nombre": "venta y canje San fco!!!!", "zona": "San Francisco", "prioridad": 2, "tipoPublicacion": "A", "miembros": 2527, "notas": ""}, {"nombre": "INTERCAMBIO SAN FRANCISCO", "zona": "San Francisco", "prioridad": 3, "notas": "Grupo de intercambio, no venta con precio", "tipoPublicacion": "A", "miembros": 1379}, {"nombre": "MIRA lo que san francisco, Córdoba tiene para ofrecerte", "zona": "San Francisco", "prioridad": 3, "tipoPublicacion": "A", "miembros": 1250, "notas": ""}, {"nombre": "compra y Ventas en josefina y zona.", "zona": "Josefina", "prioridad": 3, "tipoPublicacion": "A", "miembros": 0, "notas": ""}, {"nombre": "Empleos san francisco frontera y zona", "zona": "San Francisco / Frontera", "prioridad": 3, "notas": "Grupo de empleo, no de venta de productos", "tipoPublicacion": "A", "miembros": 7480}, {"nombre": "¿Emprendedores San Fco y zona¿¿", "zona": "San Francisco", "prioridad": 3, "notas": "Para mostrar marca/negocio, no productos puntuales", "tipoPublicacion": "A", "miembros": 2100}, {"nombre": "casas departamentos en alquiler en san francisco, frontera y zona", "zona": "San Francisco / Frontera", "prioridad": 3, "notas": "Grupo de alquiler de inmuebles, no de venta de productos", "tipoPublicacion": "A", "miembros": 12379}];
+
+
+const uid = (p) => p + "_" + Date.now().toString(36) + Math.random().toString(36).slice(2,8);
+
+function fmtFechaCorta(iso){
+  const d = new Date(iso);
+  const hoy = new Date();
+  const ayer = new Date(); ayer.setDate(hoy.getDate()-1);
+  const mismoDia = (a,b) => a.toDateString() === b.toDateString();
+  if(mismoDia(d, hoy)) return "hoy";
+  if(mismoDia(d, ayer)) return "ayer";
+  return d.toLocaleDateString("es-AR", {day:"2-digit", month:"2-digit", year:"numeric"});
+}
+
+async function storageGet(key, shared=false){
+  try{
+    const raw = window.localStorage.getItem(key);
+    return raw ? JSON.parse(raw) : null;
+  }catch(e){ return null; }
+}
+async function storageSet(key, value, shared=false){
+  try{
+    window.localStorage.setItem(key, JSON.stringify(value));
+    return true;
+  }catch(e){ console.error("storage set error", key, e); return false; }
+}
+
+function seedInicial(){
+  const grupos = SEED_GRUPOS.map(g => ({...g, id: uid("grupo")}));
+  return { grupos, publicaciones: [] };
+}
+
+function App(){
+  const [cargando, setCargando] = useState(true);
+  const [db, setDb] = useState(null);
+  const [pantalla, setPantalla] = useState("publicaciones"); // "publicaciones" | "grupos"
+  const [modalAbierto, setModalAbierto] = useState(false);
+  const [editando, setEditando] = useState(null);
+  const [grupoPublicaciones, setGrupoPublicaciones] = useState(null);
+  const [modalMasivoAbierto, setModalMasivoAbierto] = useState(false);
+  const [modoDirectoAbierto, setModoDirectoAbierto] = useState(false);
+  const [publicacionDetalle, setPublicacionDetalle] = useState(null);
+  const [modalBackupTexto, setModalBackupTexto] = useState(false);
+  const [busqueda, setBusqueda] = useState("");
+  const [filtroTipo, setFiltroTipo] = useState("todos");
+  const [orden, setOrden] = useState("prioridad");
+  const [toast, setToast] = useState(null);
+
+  const mostrarToast = useCallback((msg)=>{
+    setToast({msg, id:Date.now()});
+  }, []);
+
+  useEffect(()=>{
+    let t;
+    if(toast){ t = setTimeout(()=>setToast(null), 2400); }
+    return ()=>clearTimeout(t);
+  }, [toast]);
+
+  useEffect(()=>{
+    (async ()=>{
+      setCargando(true);
+      let data = await storageGet("grupos_mkp_v1", false);
+      if(!data){
+        data = seedInicial();
+        await storageSet("grupos_mkp_v1", data, false);
+      }
+      if(!data.publicaciones){
+        data = {...data, publicaciones: []};
+        await storageSet("grupos_mkp_v1", data, false);
+      }
+      setDb(data);
+      setCargando(false);
+    })();
+  }, []);
+
+  const guardarDb = useCallback(async (nuevaDb) => {
+    setDb(nuevaDb);
+    const ok = await storageSet("grupos_mkp_v1", nuevaDb, false);
+    if(!ok){
+      console.error("No se pudo guardar en localStorage");
+    }
+    return ok;
+  }, []);
+
+  function descargarBackup(){
+    const fecha = new Date().toISOString().slice(0,10);
+    const blob = new Blob([JSON.stringify(db, null, 2)], {type:"application/json"});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `backup_marketplace_${fecha}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    mostrarToast("Backup descargado");
+  }
+
+  function onRestaurarBackup(e){
+    const file = e.target.files && e.target.files[0];
+    if(!file) return;
+    const reader = new FileReader();
+    reader.onload = async () => {
+      try{
+        const data = JSON.parse(reader.result);
+        if(!data.grupos){ alert("El archivo no parece un backup válido de esta app."); return; }
+        if(!data.publicaciones) data.publicaciones = [];
+        if(!confirm(`Este backup tiene ${data.grupos.length} grupos y ${data.publicaciones.length} publicaciones. ¿Reemplazar los datos actuales con este backup?`)) return;
+        await guardarDb(data);
+        mostrarToast("Backup restaurado");
+      }catch(err){
+        alert("No se pudo leer el archivo. Verificá que sea un backup exportado desde esta misma app.");
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = "";
+  }
+
+  async function guardarGrupo(grupo){
+    const existe = db.grupos.some(g=>g.id===grupo.id);
+    const nuevos = existe ? db.grupos.map(g=> g.id===grupo.id ? grupo : g) : [...db.grupos, grupo];
+    await guardarDb({...db, grupos: nuevos});
+    mostrarToast("Grupo guardado");
+    setModalAbierto(false);
+    setEditando(null);
+  }
+
+  async function eliminarGrupo(id){
+    if(!confirm("¿Eliminar este grupo?")) return;
+    await guardarDb({...db, grupos: db.grupos.filter(g=>g.id!==id)});
+    mostrarToast("Grupo eliminado");
+  }
+
+  async function agregarPublicacion(grupoId, publicacion){
+    const nuevos = db.grupos.map(g=>{
+      if(g.id!==grupoId) return g;
+      const publicaciones = g.publicaciones || [];
+      return {...g, publicaciones: [publicacion, ...publicaciones]};
+    });
+    await guardarDb({...db, grupos: nuevos});
+    mostrarToast("Publicación registrada");
+  }
+
+  async function eliminarPublicacion(grupoId, publicacionId){
+    if(!confirm("¿Eliminar esta publicación del historial?")) return;
+    const nuevos = db.grupos.map(g=>{
+      if(g.id!==grupoId) return g;
+      return {...g, publicaciones: (g.publicaciones||[]).filter(p=>p.id!==publicacionId)};
+    });
+    await guardarDb({...db, grupos: nuevos});
+    mostrarToast("Publicación eliminada");
+  }
+
+  async function registrarPublicacionMasiva(grupoIds, {producto, comentario, flyerDataUrl, prod, textoA, camposB}){
+    const fecha = new Date().toISOString();
+    const nuevosGrupos = db.grupos.map(g=>{
+      if(!grupoIds.includes(g.id)) return g;
+      const publicaciones = g.publicaciones || [];
+      return {...g, publicaciones: [{id: uid("pub"), fecha, producto, comentario}, ...publicaciones]};
+    });
+    const nuevaPublicacion = {
+      id: uid("flyer"),
+      fecha,
+      producto,
+      flyerDataUrl: flyerDataUrl || null,
+      prod: prod || null,
+      textoA: textoA || "",
+      camposB: camposB || null,
+      grupoIds: [...grupoIds]
+    };
+    const nuevasPublicaciones = [nuevaPublicacion, ...(db.publicaciones||[])];
+    await guardarDb({...db, grupos: nuevosGrupos, publicaciones: nuevasPublicaciones});
+    mostrarToast(`Publicación registrada en ${grupoIds.length} grupo${grupoIds.length===1?"":"s"}`);
+  }
+
+  async function eliminarPublicacionCentral(id){
+    if(!confirm("¿Eliminar este registro de publicación? (No borra el historial dentro de cada grupo)")) return;
+    await guardarDb({...db, publicaciones: (db.publicaciones||[]).filter(p=>p.id!==id)});
+    mostrarToast("Registro eliminado");
+    setPublicacionDetalle(null);
+  }
+
+  const gruposFiltrados = useMemo(()=>{
+    if(!db) return [];
+    let lista = db.grupos.filter(g=>{
+      if(filtroTipo!=="todos" && g.tipoPublicacion!==filtroTipo) return false;
+      if(busqueda){
+        const q = busqueda.toLowerCase();
+        return g.nombre.toLowerCase().includes(q) || (g.zona||"").toLowerCase().includes(q);
+      }
+      return true;
+    });
+    if(orden==="prioridad") lista = [...lista].sort((a,b)=> (a.prioridad||2)-(b.prioridad||2) || (b.miembros||0)-(a.miembros||0));
+    if(orden==="miembros_desc") lista = [...lista].sort((a,b)=> (b.miembros||0)-(a.miembros||0));
+    if(orden==="miembros_asc") lista = [...lista].sort((a,b)=> (a.miembros||0)-(b.miembros||0));
+    if(orden==="nombre") lista = [...lista].sort((a,b)=> a.nombre.localeCompare(b.nombre));
+    if(orden==="zona") lista = [...lista].sort((a,b)=> (a.zona||"").localeCompare(b.zona||""));
+    return lista;
+  }, [db, busqueda, filtroTipo, orden]);
+
+  if(cargando || !db){
+    return (
+      <div style={{display:"flex", alignItems:"center", justifyContent:"center", height:"100vh", flexDirection:"column", gap:12}}>
+        <div style={{width:36, height:36, border:"3px solid var(--azul-100)", borderTopColor:"var(--azul-600)", borderRadius:"50%", animation:"spin 0.8s linear infinite"}}></div>
+        <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+        <div style={{color:"var(--gris-500)", fontSize:14}}>Cargando...</div>
+      </div>
+    );
+  }
+
+  const totalMiembros = db.grupos.reduce((s,g)=>s+(g.miembros||0),0);
+
+  return (
+    <div style={{minHeight:"100vh", background:"var(--gris-50)"}}>
+      <header style={{background:"var(--azul-900)", color:"#fff", padding:"18px 20px 0"}}>
+        <div style={{display:"flex", justifyContent:"space-between", alignItems:"flex-start"}}>
+          <div style={{fontWeight:800, fontSize:19}}>AB Accesorios <span style={{color:"#7fb4ea"}}>Marketplace</span></div>
+          <div style={{display:"flex", gap:6}}>
+            <button onClick={descargarBackup} title="Descargar backup" style={{background:"rgba(255,255,255,0.12)", border:"none", color:"#fff", borderRadius:6, padding:"4px 8px", fontSize:11, fontWeight:600}}>
+              ⬇️ Backup
+            </button>
+            <button onClick={()=>setModalBackupTexto(true)} title="Ver backup como texto" style={{background:"rgba(255,255,255,0.12)", border:"none", color:"#fff", borderRadius:6, padding:"4px 8px", fontSize:11, fontWeight:600}}>
+              📄 Ver texto
+            </button>
+            <input type="file" accept="application/json" id="restaurar-backup-input" onChange={onRestaurarBackup} style={{display:"none"}} />
+            <label htmlFor="restaurar-backup-input" title="Restaurar backup" style={{background:"rgba(255,255,255,0.12)", border:"none", color:"#fff", borderRadius:6, padding:"4px 8px", fontSize:11, fontWeight:600, cursor:"pointer"}}>
+              ⬆️ Restaurar
+            </label>
+          </div>
+        </div>
+        <div style={{fontSize:12.5, color:"rgba(255,255,255,0.65)", marginTop:2, marginBottom:14}}>
+          {pantalla==="publicaciones"
+            ? `${(db.publicaciones||[]).length} publicación${(db.publicaciones||[]).length===1?"":"es"} registrada${(db.publicaciones||[]).length===1?"":"s"}`
+            : `${db.grupos.length} grupos · ${totalMiembros.toLocaleString("es-AR")} miembros en total`}
+        </div>
+        <div style={{display:"flex", gap:4}}>
+          <button onClick={()=>setPantalla("publicaciones")}
+            style={{flex:1, padding:"10px 0", background:"none", border:"none", color: pantalla==="publicaciones" ? "#fff" : "rgba(255,255,255,0.55)", fontWeight:700, fontSize:13.5, borderBottom: pantalla==="publicaciones" ? "3px solid #7fb4ea" : "3px solid transparent"}}>
+            📋 Publicaciones
+          </button>
+          <button onClick={()=>setPantalla("grupos")}
+            style={{flex:1, padding:"10px 0", background:"none", border:"none", color: pantalla==="grupos" ? "#fff" : "rgba(255,255,255,0.55)", fontWeight:700, fontSize:13.5, borderBottom: pantalla==="grupos" ? "3px solid #7fb4ea" : "3px solid transparent"}}>
+            👥 Grupos
+          </button>
+        </div>
+      </header>
+
+      <main style={{padding:"18px 16px", maxWidth:720, margin:"0 auto"}}>
+
+        <button onClick={()=>setModalMasivoAbierto(true)}
+          style={{width:"100%", padding:"13px", borderRadius:10, border:"none", background:"var(--verde-600)", color:"#fff", fontWeight:700, fontSize:14.5, marginBottom:8, display:"flex", alignItems:"center", justifyContent:"center", gap:8}}>
+          📢 Armar publicación y elegir grupos
+        </button>
+        <button onClick={()=>setModoDirectoAbierto(true)}
+          style={{width:"100%", padding:"13px", borderRadius:10, border:"1px solid var(--azul-600)", background:"#fff", color:"var(--azul-600)", fontWeight:700, fontSize:14.5, marginBottom:16, display:"flex", alignItems:"center", justifyContent:"center", gap:8}}>
+          ✅ Ya publiqué en Facebook — solo elegir grupos
+        </button>
+
+        {pantalla==="publicaciones" ? (
+          (db.publicaciones||[]).length===0 ? (
+            <div style={{textAlign:"center", padding:"40px 20px", color:"var(--gris-500)", fontSize:14}}>
+              Todavía no registraste ninguna publicación. Tocá el botón de arriba para cargar tu primer flyer.
+            </div>
+          ) : (
+            <div style={{display:"flex", flexDirection:"column", gap:10}}>
+              {(db.publicaciones||[]).map(pub=>(
+                <div key={pub.id} onClick={()=>setPublicacionDetalle(pub)}
+                  style={{background:"#fff", border:"1px solid var(--gris-100)", borderRadius:12, padding:"12px 14px", display:"flex", gap:12, cursor:"pointer", alignItems:"center"}}>
+                  {pub.flyerDataUrl ? (
+                    <img src={pub.flyerDataUrl} alt="" style={{width:56, height:56, objectFit:"cover", borderRadius:8, flexShrink:0}} />
+                  ) : (
+                    <div style={{width:56, height:56, borderRadius:8, background:"var(--gris-100)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:22, flexShrink:0}}>📦</div>
+                  )}
+                  <div style={{flex:1, minWidth:0}}>
+                    <div style={{fontWeight:700, fontSize:14.5, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap"}}>{pub.producto}</div>
+                    <div style={{fontSize:12.5, color:"var(--gris-500)", marginTop:2}}>
+                      {fmtFechaCorta(pub.fecha)} · {pub.grupoIds.length} grupo{pub.grupoIds.length===1?"":"s"}
+                    </div>
+                  </div>
+                  <span style={{color:"var(--gris-300)", fontSize:18}}>›</span>
+                </div>
+              ))}
+            </div>
+          )
+        ) : (
+          <React.Fragment>
+            <div style={{display:"flex", gap:8, marginBottom:14, flexWrap:"wrap"}}>
+              <input placeholder="Buscar grupo o zona..." value={busqueda} onChange={e=>setBusqueda(e.target.value)}
+                style={{flex:"1 1 180px", padding:"10px 12px", borderRadius:8, border:"1px solid var(--gris-300)", fontSize:14}} />
+              <button onClick={()=>{setEditando(null); setModalAbierto(true);}}
+                style={{padding:"10px 16px", borderRadius:8, border:"none", background:"var(--azul-600)", color:"#fff", fontSize:14, fontWeight:600, whiteSpace:"nowrap"}}>
+                + Grupo
+              </button>
+            </div>
+
+            <div style={{display:"flex", gap:8, marginBottom:16, flexWrap:"wrap"}}>
+              <select value={filtroTipo} onChange={e=>setFiltroTipo(e.target.value)} style={{flex:"1 1 140px", padding:"8px 10px", borderRadius:8, border:"1px solid var(--gris-300)", fontSize:13}}>
+                <option value="todos">Todas las formas</option>
+                <option value="A">Tipo A (foto + libre)</option>
+                <option value="B">Tipo B (foto + campos)</option>
+              </select>
+              <select value={orden} onChange={e=>setOrden(e.target.value)} style={{flex:"1 1 140px", padding:"8px 10px", borderRadius:8, border:"1px solid var(--gris-300)", fontSize:13}}>
+                <option value="prioridad">Prioridad (1 primero)</option>
+                <option value="miembros_desc">Más miembros primero</option>
+                <option value="miembros_asc">Menos miembros primero</option>
+                <option value="nombre">Nombre (A-Z)</option>
+                <option value="zona">Zona (A-Z)</option>
+              </select>
+            </div>
+
+            {gruposFiltrados.length===0 ? (
+              <div style={{textAlign:"center", padding:"40px 20px", color:"var(--gris-500)", fontSize:14}}>
+                {db.grupos.length===0 ? "Todavía no cargaste ningún grupo. Tocá \"+ Grupo\" para empezar." : "No hay grupos que coincidan con el filtro."}
+              </div>
+            ) : (
+              <div style={{display:"flex", flexDirection:"column", gap:10}}>
+                {gruposFiltrados.map(g=>(
+                  <div key={g.id} style={{background:"#fff", border:"1px solid var(--gris-100)", borderLeft: "4px solid " + (g.prioridad===1 ? "var(--verde-600)" : g.prioridad===3 ? "var(--gris-300)" : "var(--ambar-600)"), borderRadius:12, padding:"14px 16px"}}>
+                    <div style={{display:"flex", justifyContent:"space-between", alignItems:"flex-start", gap:10}}>
+                      <div style={{flex:1, minWidth:0}}>
+                        <div style={{display:"flex", alignItems:"center", gap:7, flexWrap:"wrap"}}>
+                          <span style={{fontWeight:700, fontSize:15}}>{g.nombre}</span>
+                          <span style={{fontSize:10, padding:"2px 7px", borderRadius:20, background: g.prioridad===1 ? "var(--verde-100)" : g.prioridad===3 ? "var(--gris-100)" : "var(--ambar-100)", color: g.prioridad===1 ? "var(--verde-600)" : g.prioridad===3 ? "var(--gris-500)" : "var(--ambar-600)", fontWeight:700}}>
+                            P{g.prioridad||2}
+                          </span>
+                        </div>
+                        <div style={{fontSize:12.5, color:"var(--gris-500)", marginTop:3}}>
+                          {g.zona && <span>{g.zona} · </span>}
+                          <span style={{fontWeight:600, color:"var(--azul-700)"}}>{(g.miembros||0).toLocaleString("es-AR")} miembros</span>
+                        </div>
+                        {(g.publicaciones||[]).length>0 && (
+                          <div style={{fontSize:12, color:"var(--verde-600)", marginTop:4}}>
+                            Última publicación: {fmtFechaCorta(g.publicaciones[0].fecha)} — {g.publicaciones[0].producto}
+                          </div>
+                        )}
+                      </div>
+                      <span style={{fontSize:11, padding:"3px 9px", borderRadius:20, background: g.tipoPublicacion==="A" ? "var(--azul-100)" : "var(--ambar-100)", color: g.tipoPublicacion==="A" ? "var(--azul-700)" : "var(--ambar-600)", fontWeight:700, whiteSpace:"nowrap"}}>
+                        Tipo {g.tipoPublicacion}
+                      </span>
+                    </div>
+                    {g.notas && <div style={{fontSize:13, color:"var(--gris-700)", marginTop:8, whiteSpace:"pre-wrap"}}>{g.notas}</div>}
+                    <div style={{display:"flex", gap:16, marginTop:10, paddingTop:10, borderTop:"1px solid var(--gris-100)", alignItems:"center"}}>
+                      <button onClick={()=>setGrupoPublicaciones(g)} style={{fontSize:13, color:"var(--verde-600)", background:"none", border:"none", padding:0, fontWeight:600}}>
+                        Publicaciones {(g.publicaciones||[]).length>0 && `(${(g.publicaciones||[]).length})`}
+                      </button>
+                      <button onClick={()=>{setEditando(g); setModalAbierto(true);}} style={{fontSize:13, color:"var(--azul-600)", background:"none", border:"none", padding:0}}>Editar</button>
+                      <button onClick={()=>eliminarGrupo(g.id)} style={{fontSize:13, color:"var(--rojo-600)", background:"none", border:"none", padding:0}}>Eliminar</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </React.Fragment>
+        )}
+      </main>
+
+      {modalAbierto && (
+        <ModalGrupo grupo={editando} onGuardar={guardarGrupo} onCerrar={()=>{setModalAbierto(false); setEditando(null);}} />
+      )}
+
+      {grupoPublicaciones && (
+        <ModalPublicaciones
+          grupo={db.grupos.find(g=>g.id===grupoPublicaciones.id) || grupoPublicaciones}
+          onAgregar={(pub)=>agregarPublicacion(grupoPublicaciones.id, pub)}
+          onEliminar={(pubId)=>eliminarPublicacion(grupoPublicaciones.id, pubId)}
+          onCerrar={()=>setGrupoPublicaciones(null)}
+        />
+      )}
+
+      {modalMasivoAbierto && (
+        <ModalPublicacionMasiva
+          grupos={db.grupos}
+          onConfirmar={async (ids, datos)=>{ await registrarPublicacionMasiva(ids, datos); setModalMasivoAbierto(false); }}
+          onCerrar={()=>setModalMasivoAbierto(false)}
+        />
+      )}
+
+      {modoDirectoAbierto && (
+        <ModalPublicacionMasiva
+          grupos={db.grupos}
+          onConfirmar={async (ids, datos)=>{ await registrarPublicacionMasiva(ids, datos); setModoDirectoAbierto(false); }}
+          onCerrar={()=>setModoDirectoAbierto(false)}
+          modoDirecto={true}
+        />
+      )}
+
+      {publicacionDetalle && (
+        <ModalDetallePublicacion
+          publicacion={publicacionDetalle}
+          grupos={db.grupos}
+          onEliminar={()=>eliminarPublicacionCentral(publicacionDetalle.id)}
+          onCerrar={()=>setPublicacionDetalle(null)}
+        />
+      )}
+
+      {modalBackupTexto && (
+        <ModalBackupTexto db={db} onCerrar={()=>setModalBackupTexto(false)} />
+      )}
+
+      {toast && (
+        <div style={{position:"fixed", bottom:24, left:"50%", transform:"translateX(-50%)", background:"var(--verde-600)", color:"#fff", padding:"11px 20px", borderRadius:10, boxShadow:"0 8px 24px rgba(0,0,0,0.2)", fontSize:14, zIndex:100}}>
+          {toast.msg}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ModalBackupTexto({db, onCerrar}){
+  const [copiado, setCopiado] = useState(false);
+  const texto = JSON.stringify(db, null, 2);
+
+  async function copiarTodo(){
+    try{
+      await navigator.clipboard.writeText(texto);
+      setCopiado(true);
+      setTimeout(()=>setCopiado(false), 2000);
+    }catch(e){
+      alert("No se pudo copiar automáticamente. Tocá el texto de abajo, seleccioná todo manualmente y copiá.");
+    }
+  }
+
+  return (
+    <div className="modal-overlay" style={{position:"fixed", inset:0, background:"rgba(10,20,35,0.5)", display:"flex", alignItems:"center", justifyContent:"center", zIndex:50, padding:16}} onClick={onCerrar}>
+      <div className="modal-box" style={{background:"#fff", borderRadius:14, padding:"20px 18px", width:560, maxWidth:"100%", maxHeight:"90vh", display:"flex", flexDirection:"column"}} onClick={e=>e.stopPropagation()}>
+        <h3 style={{marginTop:0, marginBottom:6, fontSize:16, fontWeight:700}}>Backup en texto</h3>
+        <p style={{fontSize:12.5, color:"var(--gris-500)", marginTop:0, marginBottom:12}}>
+          Copiá todo este texto y guardalo en Notas, WhatsApp a vos mismo, o donde prefieras. Sirve para restaurar tus datos en otra versión de la app.
+        </p>
+        <button onClick={copiarTodo}
+          style={{padding:"10px", borderRadius:8, border:"none", background: copiado ? "var(--verde-600)" : "var(--azul-600)", color:"#fff", fontWeight:700, fontSize:13.5, marginBottom:10}}>
+          {copiado ? "¡Copiado!" : "📋 Copiar todo"}
+        </button>
+        <textarea readOnly value={texto} onFocus={e=>e.target.select()}
+          style={{flex:1, minHeight:280, padding:"9px 11px", borderRadius:8, border:"1px solid var(--gris-300)", fontSize:11, fontFamily:"monospace", resize:"none", boxSizing:"border-box"}} />
+        <button onClick={onCerrar} style={{marginTop:12, padding:"10px", borderRadius:8, border:"1px solid var(--gris-300)", background:"#fff"}}>Cerrar</button>
+      </div>
+    </div>
+  );
+}
+
+function ModalDetallePublicacion({publicacion, grupos, onEliminar, onCerrar}){
+  const gruposDePublicacion = grupos.filter(g=> publicacion.grupoIds.includes(g.id));
+
+  function fmtFecha(iso){
+    const d = new Date(iso);
+    return d.toLocaleDateString("es-AR", {day:"2-digit", month:"2-digit", year:"numeric"}) + " " + d.toLocaleTimeString("es-AR", {hour:"2-digit", minute:"2-digit"});
+  }
+
+  return (
+    <div className="modal-overlay" style={{position:"fixed", inset:0, background:"rgba(10,20,35,0.5)", display:"flex", alignItems:"center", justifyContent:"center", zIndex:50, padding:16}} onClick={onCerrar}>
+      <div className="modal-box" style={{background:"#fff", borderRadius:14, padding:"24px 22px", width:520, maxWidth:"100%", maxHeight:"90vh", overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
+        <h3 style={{marginTop:0, marginBottom:2, fontSize:16, fontWeight:700}}>{publicacion.producto}</h3>
+        <p style={{fontSize:12.5, color:"var(--gris-500)", marginTop:0, marginBottom:16}}>{fmtFecha(publicacion.fecha)}</p>
+
+        {publicacion.flyerDataUrl && (
+          <img src={publicacion.flyerDataUrl} alt="" style={{width:"100%", borderRadius:10, marginBottom:16}} />
+        )}
+
+        {publicacion.textoA && (
+          <details style={{marginBottom:14, background:"var(--gris-50)", borderRadius:10, padding:"10px 12px"}}>
+            <summary style={{fontSize:13, fontWeight:700, color:"var(--azul-700)", cursor:"pointer"}}>Ver texto que se usó</summary>
+            <div style={{marginTop:12}}>
+              <CampoCopiable label="Tipo A — texto completo" valor={publicacion.textoA} />
+              {publicacion.camposB && (
+                <React.Fragment>
+                  <CampoCopiable label="Tipo B — título" valor={publicacion.camposB.titulo} />
+                  <CampoCopiable label="Tipo B — descripción" valor={publicacion.camposB.descripcion} />
+                </React.Fragment>
+              )}
+            </div>
+          </details>
+        )}
+
+        <div style={{fontSize:12.5, fontWeight:700, color:"var(--gris-700)", marginBottom:8}}>
+          Publicado en {gruposDePublicacion.length} grupo{gruposDePublicacion.length===1?"":"s"}
+        </div>
+        <div style={{maxHeight:220, overflowY:"auto", border:"1px solid var(--gris-100)", borderRadius:10, marginBottom:18}}>
+          {gruposDePublicacion.map(g=>(
+            <div key={g.id} style={{padding:"9px 12px", borderBottom:"1px solid var(--gris-100)"}}>
+              <div style={{fontSize:13.5, fontWeight:600}}>{g.nombre}</div>
+              <div style={{fontSize:11.5, color:"var(--gris-500)"}}>{g.zona && `${g.zona} · `}Tipo {g.tipoPublicacion} · P{g.prioridad||2}</div>
+            </div>
+          ))}
+        </div>
+
+        <div style={{display:"flex", gap:10}}>
+          <button onClick={onEliminar} style={{flex:1, padding:"10px", borderRadius:8, border:"1px solid var(--rojo-600)", background:"#fff", color:"var(--rojo-600)", fontWeight:600}}>Eliminar registro</button>
+          <button onClick={onCerrar} style={{flex:1, padding:"10px", borderRadius:8, border:"none", background:"var(--azul-600)", color:"#fff", fontWeight:600}}>Cerrar</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ModalGrupo({grupo, onGuardar, onCerrar}){
+  const [form, setForm] = useState(grupo || {
+    id: uid("grupo"), nombre:"", miembros:0, zona:"", tipoPublicacion:"A", prioridad:2, notas:""
+  });
+
+  function actualizar(campo, valor){
+    setForm(f=>({...f, [campo]: valor}));
+  }
+
+  function confirmar(){
+    if(!form.nombre.trim()){ alert("Ingresá el nombre del grupo."); return; }
+    onGuardar({...form, nombre: form.nombre.trim()});
+  }
+
+  return (
+    <div className="modal-overlay" style={{position:"fixed", inset:0, background:"rgba(10,20,35,0.5)", display:"flex", alignItems:"center", justifyContent:"center", zIndex:50, padding:16}} onClick={onCerrar}>
+      <div className="modal-box" style={{background:"#fff", borderRadius:14, padding:"24px 22px", width:460, maxWidth:"100%", maxHeight:"90vh", overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
+        <h3 style={{marginTop:0, fontSize:17, fontWeight:700}}>{grupo ? "Editar grupo" : "Nuevo grupo"}</h3>
+
+        <Campo label="Nombre del grupo">
+          <input value={form.nombre} onChange={e=>actualizar("nombre", e.target.value)} style={inputStyle} placeholder='Ej: "La Ganga, San Francisco"' />
+        </Campo>
+
+        <div className="fila-campos" style={{display:"flex", gap:12}}>
+          <Campo label="Cantidad de miembros">
+            <input type="number" value={form.miembros} onChange={e=>actualizar("miembros", Number(e.target.value))} style={inputStyle} />
+          </Campo>
+          <Campo label="Zona / alcance">
+            <input value={form.zona} onChange={e=>actualizar("zona", e.target.value)} style={inputStyle} placeholder="Ej: San Francisco, Frontera" />
+          </Campo>
+        </div>
+
+        <Campo label="Forma de publicar">
+          <select value={form.tipoPublicacion} onChange={e=>actualizar("tipoPublicacion", e.target.value)} style={inputStyle}>
+            <option value="A">Tipo A — Foto + detalles libres</option>
+            <option value="B">Tipo B — Foto + título/precio/ubicación/categoría/estado/descripción</option>
+          </select>
+        </Campo>
+
+        <Campo label="Prioridad">
+          <select value={form.prioridad} onChange={e=>actualizar("prioridad", Number(e.target.value))} style={inputStyle}>
+            <option value={1}>1 — Más importante</option>
+            <option value={2}>2 — Media</option>
+            <option value={3}>3 — Menos importante</option>
+          </select>
+        </Campo>
+
+        <Campo label="Notas (opcional)">
+          <textarea value={form.notas} onChange={e=>actualizar("notas", e.target.value)} rows={3} style={{...inputStyle, resize:"vertical"}} placeholder="Reglas del grupo, mejores horarios, admin, etc." />
+        </Campo>
+
+        <div style={{display:"flex", gap:10, marginTop:18}}>
+          <button onClick={onCerrar} style={{flex:1, padding:"10px", borderRadius:8, border:"1px solid var(--gris-300)", background:"#fff"}}>Cancelar</button>
+          <button onClick={confirmar} style={{flex:1, padding:"10px", borderRadius:8, border:"none", background:"var(--azul-600)", color:"#fff", fontWeight:600}}>Guardar</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function generarTextoTipoA({nombre, modelo, variantes, precio, caracteristicas}){
+  const descripcion = modelo
+    ? `${nombre}, modelo ${modelo}.${variantes ? ` Disponible en: ${variantes}.` : ""}`
+    : `${nombre}.${variantes ? ` Disponible en: ${variantes}.` : ""}`;
+  const bloqueCaract = caracteristicas
+    .filter(c=>c.trim())
+    .map(c=>`✅ ${c.trim()}`)
+    .join("\n");
+  const bloquePrecio = precio ? `💰 Precio especial: $${precio} (por unidad)\n🚚 Envíos a todo el país` : "🚚 Envíos a todo el país";
+  return `🔧 AB Accesorios - Línea Aluminio\n\n${descripcion}\n\n${bloqueCaract}\n\n${bloquePrecio}\n\n📱 Consultas: +54 9 3564 372293\n🌐 https://ab-accesorios.netlify.app/`;
+}
+
+function generarCamposTipoB({nombre, modelo, variantes, precio, caracteristicas, categoria, estado}){
+  const titulo = modelo ? `${nombre} ${modelo}` : nombre;
+  const descripcionPartes = [];
+  if(variantes) descripcionPartes.push(`Disponible en: ${variantes}.`);
+  const caract = caracteristicas.filter(c=>c.trim());
+  if(caract.length) descripcionPartes.push(caract.join(". ") + ".");
+  descripcionPartes.push("Consultas por WhatsApp +54 9 3564 372293 — ab-accesorios.netlify.app");
+  return {
+    titulo,
+    precio: precio || "",
+    categoria: categoria || "",
+    estado: estado || "Nuevo",
+    descripcion: descripcionPartes.join(" ")
+  };
+}
+
+function CampoCopiable({label, valor}){
+  const [copiado, setCopiado] = useState(false);
+  async function copiar(){
+    try{
+      await navigator.clipboard.writeText(valor);
+      setCopiado(true);
+      setTimeout(()=>setCopiado(false), 1600);
+    }catch(e){
+      alert("No se pudo copiar. Mantené presionado el texto para copiarlo manualmente.");
+    }
+  }
+  return (
+    <div style={{marginBottom:10}}>
+      <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:4}}>
+        <label style={{fontSize:12, color:"var(--gris-700)", fontWeight:600}}>{label}</label>
+        <button onClick={copiar} style={{fontSize:12, padding:"4px 10px", borderRadius:6, border:"none", background: copiado ? "var(--verde-600)" : "var(--azul-100)", color: copiado ? "#fff" : "var(--azul-700)", fontWeight:700}}>
+          {copiado ? "¡Copiado!" : "Copiar"}
+        </button>
+      </div>
+      <div style={{background:"var(--gris-50)", border:"1px solid var(--gris-100)", borderRadius:8, padding:"9px 11px", fontSize:13.5, whiteSpace:"pre-wrap", wordBreak:"break-word"}}>
+        {valor || <span style={{color:"var(--gris-500)"}}>—</span>}
+      </div>
+    </div>
+  );
+}
+
+function diasDesde(iso){
+  const ms = Date.now() - new Date(iso).getTime();
+  return Math.floor(ms / (1000*60*60*24));
+}
+
+function publicoRecienEsteProducto(grupo, nombreProducto, diasLimite=15){
+  if(!nombreProducto) return null;
+  const publicaciones = grupo.publicaciones || [];
+  const nombreLower = nombreProducto.toLowerCase();
+  const match = publicaciones.find(p=> p.producto && p.producto.toLowerCase().includes(nombreLower) && diasDesde(p.fecha) < diasLimite);
+  return match ? diasDesde(match.fecha) : null;
+}
+
+function diasDesdeUltimaPublicacion(grupo){
+  const publicaciones = grupo.publicaciones || [];
+  if(publicaciones.length===0) return Infinity;
+  const masReciente = publicaciones.reduce((max,p)=> new Date(p.fecha) > new Date(max.fecha) ? p : max, publicaciones[0]);
+  return diasDesde(masReciente.fecha);
+}
+
+function calcularPreSeleccion(grupos, limite=9, excluirIds=[]){
+  const ordenarRotacion = (a,b) => {
+    const diasA = diasDesdeUltimaPublicacion(a), diasB = diasDesdeUltimaPublicacion(b);
+    if(diasA!==diasB) return diasB - diasA; // más días sin publicar primero (Infinity = nunca publicado, va primero)
+    return (b.miembros||0) - (a.miembros||0); // empate: más miembros primero
+  };
+  const disponibles = grupos.filter(g=> !excluirIds.includes(g.id));
+  const p1 = disponibles.filter(g=> (g.prioridad||2)===1).sort(ordenarRotacion).map(g=>g.id);
+  const p2 = disponibles.filter(g=> (g.prioridad||2)===2).sort(ordenarRotacion).map(g=>g.id);
+  const p3 = disponibles.filter(g=> (g.prioridad||2)===3).sort(ordenarRotacion).map(g=>g.id);
+  return [...p1, ...p2, ...p3].slice(0, limite);
+}
+
+function parsearTextoPublicacion(texto){
+  const avisos = [];
+  const lineas = texto.split("\n").map(l=>l.trim()).filter(l=>l.length>0);
+
+  // Nombre + modelo: busca línea con patrón "Nombre, modelo XXX." (ignora la línea de encabezado con 🔧/🔵/AB Accesorios)
+  let nombre = "", modelo = "", descripcionExtra = "";
+  const lineaProducto = lineas.find(l => !l.includes("AB Accesorios") && /,\s*modelo\s+/i.test(l));
+  if(lineaProducto){
+    const match = lineaProducto.match(/^(.*?),\s*modelo\s+([\wÀ-ÿ0-9\-]+)\.?\s*(.*)$/i);
+    if(match){
+      nombre = match[1].trim();
+      modelo = match[2].trim();
+      descripcionExtra = match[3].trim();
+    }
+  } else {
+    avisos.push('No encontré el patrón "..., modelo XXX." — completá nombre y modelo a mano.');
+    const primeraLinea = lineas.find(l => !l.includes("AB Accesorios"));
+    if(primeraLinea) nombre = primeraLinea.replace(/^[^\wÀ-ÿ]+/, "").trim();
+  }
+
+  // Variantes: si el resto de la descripción menciona "Disponible en:"
+  let variantes = "";
+  const matchVariantes = descripcionExtra.match(/Disponible en:\s*(.+?)\.?$/i);
+  if(matchVariantes) variantes = matchVariantes[1].trim();
+
+  // Características: líneas que empiezan con ✅
+  const caracteristicas = lineas
+    .filter(l => l.startsWith("✅"))
+    .map(l => l.replace(/^✅\s*/, "").trim())
+    .slice(0, 4);
+  while(caracteristicas.length < 4) caracteristicas.push("");
+  if(lineas.filter(l=>l.startsWith("✅")).length===0){
+    avisos.push("No encontré líneas con ✅ — completá las características a mano.");
+  }
+
+  // Precio: línea con 💰, extraer números
+  let precio = "";
+  const lineaPrecio = lineas.find(l => l.includes("💰"));
+  if(lineaPrecio){
+    const matchPrecio = lineaPrecio.match(/\$\s*([\d.,]+)/);
+    if(matchPrecio) precio = matchPrecio[1].trim();
+  }
+  if(!precio) avisos.push("No encontré un precio con \"$\" junto a 💰 — completalo a mano.");
+
+  return {
+    datos: { nombre, modelo, variantes, precio, caracteristicas },
+    avisos
+  };
+}
+
+function ListaTanda({titulo, descripcionLimite, grupos, gruposFiltrados, seleccionados, limite, busqueda, onBusqueda, onToggle, onMarcarDesmarcarTodos, onRecomendar, prod}){
+  const enTope = seleccionados.length>=limite;
+  return (
+    <div style={{marginBottom:18, border:"1px solid var(--gris-100)", borderRadius:12, padding:"12px 12px 14px"}}>
+      <div style={{fontSize:13.5, fontWeight:700, marginBottom:2}}>{titulo}</div>
+      <div style={{fontSize:11.5, color:"var(--gris-500)", marginBottom:10}}>{descripcionLimite}</div>
+
+      <div style={{display:"flex", gap:8, marginBottom:8}}>
+        <input placeholder="Buscar grupo o zona..." value={busqueda} onChange={e=>onBusqueda(e.target.value)}
+          style={{flex:1, padding:"8px 10px", borderRadius:8, border:"1px solid var(--gris-300)", fontSize:13}} />
+        {onRecomendar && (
+          <button onClick={onRecomendar} style={{padding:"8px 10px", borderRadius:8, border:"1px solid var(--verde-600)", background:"#fff", color:"var(--verde-600)", fontSize:12, fontWeight:700, whiteSpace:"nowrap"}}>
+            ✨ Recomendar
+          </button>
+        )}
+        <button onClick={onMarcarDesmarcarTodos} style={{padding:"8px 10px", borderRadius:8, border:"1px solid var(--azul-600)", background:"#fff", color:"var(--azul-600)", fontSize:12, fontWeight:700, whiteSpace:"nowrap"}}>
+          Todos
+        </button>
+      </div>
+
+      <div style={{fontSize:12, color: enTope ? "var(--ambar-600)" : "var(--gris-500)", marginBottom:6, fontWeight: enTope ? 700 : 400}}>
+        {seleccionados.length} de {limite} seleccionados
+      </div>
+
+      <div style={{maxHeight:200, overflowY:"auto", border:"1px solid var(--gris-100)", borderRadius:10}}>
+        {gruposFiltrados.length===0 ? (
+          <div style={{padding:16, textAlign:"center", fontSize:13, color:"var(--gris-500)"}}>Sin resultados.</div>
+        ) : gruposFiltrados.map(g=>{
+          const diasRepeticion = prod ? publicoRecienEsteProducto(g, `${prod.nombre} ${prod.modelo}`.trim()) : null;
+          return (
+            <label key={g.id} style={{display:"flex", alignItems:"center", gap:9, padding:"8px 10px", borderBottom:"1px solid var(--gris-100)", cursor:"pointer"}}>
+              <input type="checkbox" checked={seleccionados.includes(g.id)} onChange={()=>onToggle(g.id)} style={{width:16, height:16, flexShrink:0}} />
+              <div style={{flex:1, minWidth:0}}>
+                <div style={{fontSize:13, fontWeight:600}}>{g.nombre}</div>
+                <div style={{fontSize:11, color:"var(--gris-500)"}}>
+                  {g.zona && `${g.zona} · `}Tipo {g.tipoPublicacion} · P{g.prioridad||2}
+                </div>
+                {diasRepeticion!==null && (
+                  <div style={{fontSize:11, color:"var(--ambar-600)", fontWeight:700, marginTop:2}}>
+                    ⚠️ Ya publicaste esto acá hace {diasRepeticion===0 ? "hoy" : `${diasRepeticion} día${diasRepeticion===1?"":"s"}`}
+                  </div>
+                )}
+              </div>
+            </label>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function ModalPublicacionMasiva({grupos, onConfirmar, onCerrar, modoDirecto=false}){
+  const [paso, setPaso] = useState(modoDirecto ? 2 : 1);
+  const [prod, setProd] = useState({nombre:"", modelo:"", variantes:"", precio:"", categoria:"", estado:"Nuevo", caracteristicas:["", "", "", ""]});
+  const [seleccionadosCompartir, setSeleccionadosCompartir] = useState(()=> modoDirecto ? calcularPreSeleccion(grupos, 9) : []);
+  const [seleccionadosMarketplace, setSeleccionadosMarketplace] = useState([]);
+  const [busquedaCompartir, setBusquedaCompartir] = useState("");
+  const [busquedaMarketplace, setBusquedaMarketplace] = useState("");
+  const [flyerPreview, setFlyerPreview] = useState(null);
+  const [leyendoFlyer, setLeyendoFlyer] = useState(false);
+  const [errorLectura, setErrorLectura] = useState("");
+  const [textoPegado, setTextoPegado] = useState("");
+  const [avisosParseo, setAvisosParseo] = useState([]);
+
+  async function onSubirFlyer(e){
+    const file = e.target.files && e.target.files[0];
+    if(!file) return;
+    setErrorLectura("");
+    const reader = new FileReader();
+    reader.onload = () => {
+      setFlyerPreview({dataUrl: reader.result, mediaType: file.type});
+    };
+    reader.readAsDataURL(file);
+  }
+
+  async function leerFlyer(){
+    if(!flyerPreview) return;
+    setLeyendoFlyer(true);
+    setErrorLectura("");
+    try{
+      const base64 = flyerPreview.dataUrl.split(",")[1];
+      const datos = await leerFlyerConIA(base64, flyerPreview.mediaType);
+      setProd(p=>({
+        ...p,
+        nombre: datos.nombre || p.nombre,
+        modelo: datos.modelo || p.modelo,
+        precio: datos.precio || p.precio,
+        variantes: datos.variantes || p.variantes,
+        categoria: datos.categoria || p.categoria,
+        estado: datos.estado || p.estado,
+        caracteristicas: (datos.caracteristicas && datos.caracteristicas.length===4) ? datos.caracteristicas : p.caracteristicas
+      }));
+    }catch(err){
+      setErrorLectura(err.message || "No se pudo leer el flyer. Cargá los datos a mano.");
+    }
+    setLeyendoFlyer(false);
+  }
+
+  function procesarTextoPegado(){
+    if(!textoPegado.trim()){ setAvisosParseo(["Pegá primero el texto de la publicación."]); return; }
+    const {datos, avisos} = parsearTextoPublicacion(textoPegado);
+    setProd(p=>({
+      ...p,
+      nombre: datos.nombre || p.nombre,
+      modelo: datos.modelo || p.modelo,
+      variantes: datos.variantes || p.variantes,
+      precio: datos.precio || p.precio,
+      caracteristicas: datos.caracteristicas.some(c=>c) ? datos.caracteristicas : p.caracteristicas
+    }));
+    setAvisosParseo(avisos);
+  }
+
+  function actualizarProd(campo, valor){
+    setProd(p=>({...p, [campo]: valor}));
+  }
+  function actualizarCaract(i, valor){
+    setProd(p=>{
+      const c = [...p.caracteristicas];
+      c[i] = valor;
+      return {...p, caracteristicas: c};
+    });
+  }
+
+  function irAPaso2(){
+    if(!prod.nombre.trim()){ alert("Ingresá al menos el nombre del producto."); return; }
+    if(seleccionadosCompartir.length===0){
+      setSeleccionadosCompartir(calcularPreSeleccion(grupos, 9));
+    }
+    setPaso(2);
+  }
+
+  const textoA = useMemo(()=> generarTextoTipoA(prod), [prod]);
+  const camposB = useMemo(()=> generarCamposTipoB(prod), [prod]);
+
+  const gruposFiltradosCompartir = useMemo(()=>{
+    if(!busquedaCompartir) return grupos;
+    const q = busquedaCompartir.toLowerCase();
+    return grupos.filter(g=> g.nombre.toLowerCase().includes(q) || (g.zona||"").toLowerCase().includes(q));
+  }, [grupos, busquedaCompartir]);
+
+  const gruposFiltradosMarketplace = useMemo(()=>{
+    if(!busquedaMarketplace) return grupos;
+    const q = busquedaMarketplace.toLowerCase();
+    return grupos.filter(g=> g.nombre.toLowerCase().includes(q) || (g.zona||"").toLowerCase().includes(q));
+  }, [grupos, busquedaMarketplace]);
+
+  const LIMITE_COMPARTIR = 9;
+  const LIMITE_MARKETPLACE = 20;
+
+  function toggleGrupoCompartir(id){
+    setSeleccionadosCompartir(s=>{
+      if(s.includes(id)) return s.filter(x=>x!==id);
+      if(seleccionadosMarketplace.includes(id)){
+        alert("Ese grupo ya está tildado en la tanda de Marketplace. Elegí uno de los dos.");
+        return s;
+      }
+      if(s.length>=LIMITE_COMPARTIR){
+        alert(`Facebook permite compartir en hasta ${LIMITE_COMPARTIR} grupos por vez. Desmarcá alguno antes de agregar otro.`);
+        return s;
+      }
+      return [...s, id];
+    });
+  }
+
+  function toggleGrupoMarketplace(id){
+    setSeleccionadosMarketplace(s=>{
+      if(s.includes(id)) return s.filter(x=>x!==id);
+      if(seleccionadosCompartir.includes(id)){
+        alert("Ese grupo ya está tildado en la tanda de Compartir. Elegí uno de los dos.");
+        return s;
+      }
+      if(s.length>=LIMITE_MARKETPLACE){
+        alert(`Vía Marketplace, Facebook permite hasta ${LIMITE_MARKETPLACE} grupos por vez. Desmarcá alguno antes de agregar otro.`);
+        return s;
+      }
+      return [...s, id];
+    });
+  }
+
+  function marcarDesmarcarTodosCompartir(){
+    const idsVisibles = gruposFiltradosCompartir.map(g=>g.id).filter(id=> !seleccionadosMarketplace.includes(id));
+    const todosMarcados = idsVisibles.every(id=>seleccionadosCompartir.includes(id));
+    if(todosMarcados){
+      setSeleccionadosCompartir(s=> s.filter(id=> !idsVisibles.includes(id)));
+    } else {
+      const combinados = Array.from(new Set([...seleccionadosCompartir, ...idsVisibles]));
+      if(combinados.length>LIMITE_COMPARTIR){
+        alert(`Facebook permite compartir en hasta ${LIMITE_COMPARTIR} grupos por vez. Con el filtro actual se pasarían de ${LIMITE_COMPARTIR}, tildá manualmente los que más te importen.`);
+        return;
+      }
+      setSeleccionadosCompartir(combinados);
+    }
+  }
+
+  function marcarDesmarcarTodosMarketplace(){
+    const idsVisibles = gruposFiltradosMarketplace.map(g=>g.id).filter(id=> !seleccionadosCompartir.includes(id));
+    const todosMarcados = idsVisibles.every(id=>seleccionadosMarketplace.includes(id));
+    if(todosMarcados){
+      setSeleccionadosMarketplace(s=> s.filter(id=> !idsVisibles.includes(id)));
+    } else {
+      const combinados = Array.from(new Set([...seleccionadosMarketplace, ...idsVisibles]));
+      if(combinados.length>LIMITE_MARKETPLACE){
+        alert(`Vía Marketplace, Facebook permite hasta ${LIMITE_MARKETPLACE} grupos por vez. Con el filtro actual se pasarían de ${LIMITE_MARKETPLACE}, tildá manualmente los que más te importen.`);
+        return;
+      }
+      setSeleccionadosMarketplace(combinados);
+    }
+  }
+
+  function recomendarMarketplace(){
+    const recomendados = calcularPreSeleccion(grupos, LIMITE_MARKETPLACE, seleccionadosCompartir);
+    setSeleccionadosMarketplace(recomendados);
+  }
+
+  function confirmar(){
+    if(!prod.nombre.trim()){ alert("Ingresá qué producto publicaste."); return; }
+    const seleccionados = Array.from(new Set([...seleccionadosCompartir, ...seleccionadosMarketplace]));
+    if(seleccionados.length===0){ alert("Tildá al menos un grupo en alguna de las dos tandas."); return; }
+    const nombreResumen = prod.modelo ? `${prod.nombre} ${prod.modelo}` : prod.nombre;
+    const precioResumen = prod.precio ? ` — $${prod.precio}` : "";
+    onConfirmar(seleccionados, {
+      producto: nombreResumen + precioResumen,
+      comentario: "",
+      flyerDataUrl: flyerPreview ? flyerPreview.dataUrl : null,
+      prod,
+      textoA: modoDirecto ? "" : textoA,
+      camposB: modoDirecto ? null : camposB
+    });
+  }
+
+  return (
+    <div className="modal-overlay" style={{position:"fixed", inset:0, background:"rgba(10,20,35,0.5)", display:"flex", alignItems:"center", justifyContent:"center", zIndex:50, padding:16}} onClick={onCerrar}>
+      <div className="modal-box" style={{background:"#fff", borderRadius:14, padding:"24px 22px", width:520, maxWidth:"100%", maxHeight:"90vh", overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
+        <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:2}}>
+          <h3 style={{marginTop:0, marginBottom:2, fontSize:16, fontWeight:700}}>Publicar en varios grupos</h3>
+          <span style={{fontSize:12, color:"var(--gris-500)", fontWeight:600}}>Paso {paso} de 2</span>
+        </div>
+
+        {paso===1 && (
+          <div>
+            <p style={{fontSize:13, color:"var(--gris-500)", marginTop:2, marginBottom:12}}>
+              Pegá el texto completo de la publicación (o subí el flyer) para autocompletar el formulario. Después revisá y corregí lo que haga falta.
+            </p>
+
+            <div style={{background:"var(--gris-50)", border:"1px dashed var(--gris-300)", borderRadius:10, padding:14, marginBottom:14}}>
+              <label style={{display:"block", fontSize:12.5, fontWeight:600, color:"var(--gris-700)", marginBottom:6}}>Pegar texto de la publicación (Tipo A)</label>
+              <textarea value={textoPegado} onChange={e=>setTextoPegado(e.target.value)}
+                placeholder={"Pegá acá el texto completo, ej:\n\n🔧 AB Accesorios - Línea Aluminio\n\nManija Recta Doble Balancín, modelo BRZ-1050...\n\n✅ Material: Acero inoxidable\n...\n\n💰 Precio especial: $11.000..."}
+                style={{width:"100%", minHeight:110, padding:"9px 11px", borderRadius:8, border:"1px solid var(--gris-300)", fontSize:13, fontFamily:"inherit", resize:"vertical", boxSizing:"border-box"}} />
+              <button onClick={procesarTextoPegado}
+                style={{width:"100%", marginTop:10, padding:"10px", borderRadius:8, border:"none", background:"var(--azul-600)", color:"#fff", fontWeight:700, fontSize:13.5}}>
+                📋 Extraer datos del texto
+              </button>
+              {avisosParseo.length>0 && (
+                <div style={{marginTop:10, fontSize:12.5, color:"var(--ambar-600)", background:"var(--ambar-100)", borderRadius:8, padding:"8px 10px"}}>
+                  {avisosParseo.map((a,i)=>(<div key={i}>⚠️ {a}</div>))}
+                </div>
+              )}
+            </div>
+
+            <div style={{background:"var(--gris-50)", border:"1px dashed var(--gris-300)", borderRadius:10, padding:14, marginBottom:16}}>
+              <input type="file" accept="image/*" id="flyer-input" onChange={onSubirFlyer} style={{display:"none"}} />
+              <label htmlFor="flyer-input" style={{display:"block", cursor:"pointer"}}>
+                {flyerPreview ? (
+                  <img src={flyerPreview.dataUrl} alt="Flyer" style={{maxWidth:"100%", maxHeight:180, borderRadius:8, display:"block", margin:"0 auto"}} />
+                ) : (
+                  <div style={{textAlign:"center", padding:"14px 6px", color:"var(--gris-500)", fontSize:13.5}}>
+                    📎 O tocá acá para subir la foto del flyer
+                  </div>
+                )}
+              </label>
+
+              {flyerPreview && (
+                <button onClick={leerFlyer} disabled={leyendoFlyer}
+                  style={{width:"100%", marginTop:12, padding:"10px", borderRadius:8, border:"none", background: leyendoFlyer ? "var(--gris-300)" : "var(--azul-600)", color:"#fff", fontWeight:700, fontSize:13.5}}>
+                  {leyendoFlyer ? "Leyendo flyer..." : "🔎 Leer datos del flyer"}
+                </button>
+              )}
+
+              {errorLectura && (
+                <div style={{marginTop:10, fontSize:12.5, color:"var(--rojo-600)", background:"var(--rojo-100)", borderRadius:8, padding:"8px 10px"}}>
+                  {errorLectura}
+                </div>
+              )}
+            </div>
+
+            <Campo label="Nombre del producto">
+              <input value={prod.nombre} onChange={e=>actualizarProd("nombre", e.target.value)} style={inputStyle} placeholder='Ej: "Manija Doble Balancín"' />
+            </Campo>
+
+            <div className="fila-campos" style={{display:"flex", gap:12}}>
+              <Campo label="Modelo / código (opcional)">
+                <input value={prod.modelo} onChange={e=>actualizarProd("modelo", e.target.value)} style={inputStyle} placeholder="Ej: FA-430" />
+              </Campo>
+              <Campo label="Precio">
+                <input value={prod.precio} onChange={e=>actualizarProd("precio", e.target.value)} style={inputStyle} placeholder="Ej: 10.500" />
+              </Campo>
+            </div>
+
+            <Campo label="Variantes / colores (opcional)">
+              <input value={prod.variantes} onChange={e=>actualizarProd("variantes", e.target.value)} style={inputStyle} placeholder="Ej: Blanco (FA-430-B) / Negro (FA-430-N)" />
+            </Campo>
+
+            <div className="fila-campos" style={{display:"flex", gap:12}}>
+              <Campo label="Categoría (para Tipo B)">
+                <input value={prod.categoria} onChange={e=>actualizarProd("categoria", e.target.value)} style={inputStyle} placeholder="Ej: Herramientas" />
+              </Campo>
+              <Campo label="Estado (para Tipo B)">
+                <select value={prod.estado} onChange={e=>actualizarProd("estado", e.target.value)} style={inputStyle}>
+                  <option value="Nuevo">Nuevo</option>
+                  <option value="Usado - como nuevo">Usado - como nuevo</option>
+                  <option value="Usado - buen estado">Usado - buen estado</option>
+                </select>
+              </Campo>
+            </div>
+
+            <label style={{display:"block", fontSize:12.5, color:"var(--gris-700)", marginBottom:5, fontWeight:600}}>Características (hasta 4)</label>
+            {prod.caracteristicas.map((c,i)=>(
+              <input key={i} value={c} onChange={e=>actualizarCaract(i, e.target.value)} style={{...inputStyle, marginBottom:8}} placeholder={`Ej: ${["Material: Aluminio","Incluye cerradura y varilla","Resistencia y durabilidad","Calidad garantizada"][i]}`} />
+            ))}
+
+            <div style={{display:"flex", gap:10, marginTop:18}}>
+              <button onClick={onCerrar} style={{flex:1, padding:"10px", borderRadius:8, border:"1px solid var(--gris-300)", background:"#fff"}}>Cancelar</button>
+              <button onClick={irAPaso2} style={{flex:1, padding:"10px", borderRadius:8, border:"none", background:"var(--azul-600)", color:"#fff", fontWeight:600}}>Siguiente →</button>
+            </div>
+          </div>
+        )}
+
+        {paso===2 && (
+          <div>
+            {modoDirecto && (
+              <div style={{marginBottom:16}}>
+                <p style={{fontSize:13, color:"var(--gris-500)", marginTop:2, marginBottom:12}}>
+                  Ya armaste la publicación en Facebook. Contame qué publicaste y elegí en qué grupos la vas a compartir.
+                </p>
+                <Campo label="¿Qué producto publicaste?">
+                  <input value={prod.nombre} onChange={e=>actualizarProd("nombre", e.target.value)} style={inputStyle} placeholder='Ej: "Manija Recta Doble Balancín BRZ-1050"' autoFocus />
+                </Campo>
+              </div>
+            )}
+
+            {!modoDirecto && (
+              <details style={{marginBottom:14, background:"var(--gris-50)", borderRadius:10, padding:"10px 12px"}}>
+                <summary style={{fontSize:13, fontWeight:700, color:"var(--azul-700)", cursor:"pointer"}}>Ver texto generado (tocá para expandir)</summary>
+                <div style={{marginTop:12}}>
+                  <div style={{fontSize:12, fontWeight:700, color:"var(--gris-700)", marginBottom:6}}>TIPO A — texto único (foto + libre)</div>
+                  <CampoCopiable label="Publicación completa" valor={textoA} />
+
+                  <div style={{fontSize:12, fontWeight:700, color:"var(--gris-700)", margin:"14px 0 6px"}}>TIPO B — campos separados</div>
+                  <CampoCopiable label="Título" valor={camposB.titulo} />
+                  <CampoCopiable label="Precio" valor={camposB.precio} />
+                  <CampoCopiable label="Categoría" valor={camposB.categoria} />
+                  <CampoCopiable label="Estado" valor={camposB.estado} />
+                  <CampoCopiable label="Descripción" valor={camposB.descripcion} />
+                </div>
+              </details>
+            )}
+
+            <ListaTanda
+              titulo="📤 Tanda 1: Compartir rápido"
+              descripcionLimite={`Hasta ${9} grupos por publicación (límite de Facebook al compartir directo). Se tildan solos priorizando Prioridad 1 y 2, rotando los que hace más no publicás.`}
+              grupos={grupos}
+              gruposFiltrados={gruposFiltradosCompartir}
+              seleccionados={seleccionadosCompartir}
+              limite={9}
+              busqueda={busquedaCompartir}
+              onBusqueda={setBusquedaCompartir}
+              onToggle={toggleGrupoCompartir}
+              onMarcarDesmarcarTodos={marcarDesmarcarTodosCompartir}
+              prod={prod}
+            />
+
+            <ListaTanda
+              titulo="🛒 Tanda 2: Vía Marketplace (opcional)"
+              descripcionLimite={`Hasta ${20} grupos distintos de la Tanda 1, publicando a través de Marketplace + "En tus grupos".`}
+              grupos={grupos}
+              gruposFiltrados={gruposFiltradosMarketplace}
+              seleccionados={seleccionadosMarketplace}
+              limite={20}
+              busqueda={busquedaMarketplace}
+              onBusqueda={setBusquedaMarketplace}
+              onToggle={toggleGrupoMarketplace}
+              onMarcarDesmarcarTodos={marcarDesmarcarTodosMarketplace}
+              onRecomendar={recomendarMarketplace}
+              prod={prod}
+            />
+
+            <div style={{fontSize:12.5, color:"var(--gris-700)", fontWeight:700, marginBottom:10}}>
+              Total combinado: {seleccionadosCompartir.length + seleccionadosMarketplace.length} grupos
+            </div>
+
+            <div style={{display:"flex", gap:10, marginTop:8}}>
+              <button onClick={()=> modoDirecto ? onCerrar() : setPaso(1)} style={{flex:1, padding:"10px", borderRadius:8, border:"1px solid var(--gris-300)", background:"#fff"}}>
+                {modoDirecto ? "Cancelar" : "← Atrás"}
+              </button>
+              <button onClick={confirmar} style={{flex:1.4, padding:"10px", borderRadius:8, border:"none", background:"var(--verde-600)", color:"#fff", fontWeight:700}}>
+                Registrar en {(seleccionadosCompartir.length + seleccionadosMarketplace.length) || ""} grupo{(seleccionadosCompartir.length + seleccionadosMarketplace.length)===1?"":"s"}
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ModalPublicaciones({grupo, onAgregar, onEliminar, onCerrar}){
+  const [producto, setProducto] = useState("");
+  const [comentario, setComentario] = useState("");
+
+  const publicaciones = grupo.publicaciones || [];
+
+  function agregar(){
+    if(!producto.trim()){ alert("Ingresá qué producto publicaste."); return; }
+    onAgregar({
+      id: uid("pub"),
+      fecha: new Date().toISOString(),
+      producto: producto.trim(),
+      comentario: comentario.trim()
+    });
+    setProducto("");
+    setComentario("");
+  }
+
+  function fmtFecha(iso){
+    const d = new Date(iso);
+    return d.toLocaleDateString("es-AR", {day:"2-digit", month:"2-digit", year:"numeric"}) + " " + d.toLocaleTimeString("es-AR", {hour:"2-digit", minute:"2-digit"});
+  }
+
+  return (
+    <div className="modal-overlay" style={{position:"fixed", inset:0, background:"rgba(10,20,35,0.5)", display:"flex", alignItems:"center", justifyContent:"center", zIndex:50, padding:16}} onClick={onCerrar}>
+      <div className="modal-box" style={{background:"#fff", borderRadius:14, padding:"24px 22px", width:480, maxWidth:"100%", maxHeight:"90vh", overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
+        <h3 style={{marginTop:0, fontSize:16, fontWeight:700, marginBottom:2}}>Publicaciones</h3>
+        <p style={{fontSize:13, color:"var(--gris-500)", marginTop:0, marginBottom:16}}>{grupo.nombre}</p>
+
+        <div style={{background:"var(--gris-50)", borderRadius:10, padding:14, marginBottom:18}}>
+          <Campo label="¿Qué publicaste?">
+            <input value={producto} onChange={e=>setProducto(e.target.value)} style={inputStyle} placeholder='Ej: "Picaporte H50 blanco $10.500"' />
+          </Campo>
+          <Campo label="Comentario (opcional)">
+            <textarea value={comentario} onChange={e=>setComentario(e.target.value)} rows={2} style={{...inputStyle, resize:"vertical"}} placeholder="Alguna nota sobre esta publicación..." />
+          </Campo>
+          <button onClick={agregar} style={{width:"100%", padding:"9px", borderRadius:8, border:"none", background:"var(--verde-600)", color:"#fff", fontWeight:600, fontSize:13.5}}>
+            + Registrar publicación de hoy
+          </button>
+        </div>
+
+        {publicaciones.length===0 ? (
+          <div style={{textAlign:"center", padding:"20px 10px", color:"var(--gris-500)", fontSize:13}}>
+            Todavía no registraste ninguna publicación en este grupo.
+          </div>
+        ) : (
+          <div>
+            <div style={{fontSize:12.5, fontWeight:600, color:"var(--gris-700)", marginBottom:8}}>Historial ({publicaciones.length})</div>
+            {publicaciones.map(p=>(
+              <div key={p.id} style={{borderBottom:"1px solid var(--gris-100)", padding:"10px 0"}}>
+                <div style={{display:"flex", justifyContent:"space-between", alignItems:"flex-start", gap:8}}>
+                  <div style={{flex:1, minWidth:0}}>
+                    <div style={{fontWeight:600, fontSize:13.5}}>{p.producto}</div>
+                    <div style={{fontSize:11.5, color:"var(--gris-500)", marginTop:2}}>{fmtFecha(p.fecha)}</div>
+                    {p.comentario && <div style={{fontSize:13, color:"var(--gris-700)", marginTop:4}}>{p.comentario}</div>}
+                  </div>
+                  <button onClick={()=>onEliminar(p.id)} style={{background:"none", border:"none", color:"var(--rojo-600)", fontSize:12, padding:0, flexShrink:0}}>Eliminar</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div style={{marginTop:18}}>
+          <button onClick={onCerrar} style={{width:"100%", padding:"10px", borderRadius:8, border:"1px solid var(--gris-300)", background:"#fff"}}>Cerrar</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Campo({label, children}){
+  return (
+    <div style={{marginBottom:14}}>
+      <label style={{display:"block", fontSize:12.5, color:"var(--gris-700)", marginBottom:5, fontWeight:600}}>{label}</label>
+      {children}
+    </div>
+  );
+}
+
+const inputStyle = {width:"100%", padding:"9px 11px", borderRadius:7, border:"1px solid var(--gris-300)", fontSize:14};
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
+</body>
+</html>
