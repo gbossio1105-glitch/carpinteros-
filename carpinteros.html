@@ -275,6 +275,21 @@ function App(){
           return c;
         });
 
+        // Migración 3: sumamos los carpinteros nuevos que están en SEED_CARPINTEROS
+        // pero todavía no existen en los datos guardados (comparando por nombre,
+        // que es la clave estable entre el seed y lo que ya tenés cargado).
+        // No toca ni reemplaza a los que ya existen.
+        const nombresExistentes = new Set(carpinterosMigrados.map(c => (c.nombre||"").trim().toUpperCase()));
+        const faltantes = SEED_CARPINTEROS.filter(c => !nombresExistentes.has((c.nombre||"").trim().toUpperCase()));
+        if(faltantes.length > 0){
+          huboMigracion = true;
+          const nuevosCarpinteros = faltantes.map(c => {
+            const { telefono, ...resto } = c;
+            return {...resto, id: uid("carp"), eventos: [], telefonos: separarTelefonos(telefono)};
+          });
+          carpinterosMigrados = [...carpinterosMigrados, ...nuevosCarpinteros];
+        }
+
         if(huboMigracion){
           data = {...data, carpinteros: carpinterosMigrados};
           await storageSet("carpinteros_v1", data);
