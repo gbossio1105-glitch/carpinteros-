@@ -305,6 +305,40 @@ function App(){
     await storageSet("carpinteros_v1", nuevaDb);
   }, []);
 
+  function exportarBackup(){
+    const fecha = new Date().toISOString().slice(0,10);
+    const blob = new Blob([JSON.stringify(db, null, 2)], {type:"application/json"});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `carpinteros_backup_${fecha}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    mostrarToast("Backup descargado");
+  }
+
+  function importarBackup(archivo){
+    const lector = new FileReader();
+    lector.onload = async (e) => {
+      try {
+        const datos = JSON.parse(e.target.result);
+        if(!datos || !Array.isArray(datos.carpinteros)){
+          alert("El archivo no tiene el formato esperado (carpinteros_backup_....json).");
+          return;
+        }
+        const cantidad = datos.carpinteros.length;
+        if(!confirm(`Este backup tiene ${cantidad} carpinteros. Esto va a REEMPLAZAR todos los datos actuales de este dispositivo. ¿Continuar?`)) return;
+        await guardarDb(datos);
+        mostrarToast(`Backup restaurado: ${cantidad} carpinteros`);
+      } catch(err){
+        alert("No se pudo leer el archivo. Verificá que sea un backup válido exportado desde esta misma app.");
+      }
+    };
+    lector.readAsText(archivo);
+  }
+
   async function guardarCarpintero(carp){
     const existe = db.carpinteros.some(c=>c.id===carp.id);
     const nuevos = existe ? db.carpinteros.map(c=> c.id===carp.id ? carp : c) : [...db.carpinteros, {...carp, eventos:[]}];
@@ -457,6 +491,18 @@ function App(){
               fontSize:14, fontWeight:600, whiteSpace:"nowrap"}}>
             {modoSeleccion ? "✕ Cancelar selección" : "☑ Selección masiva"}
           </button>
+        </div>
+
+        <div style={{display:"flex", gap:8, marginBottom:14, flexWrap:"wrap"}}>
+          <button onClick={exportarBackup}
+            style={{padding:"8px 14px", borderRadius:8, border:"1px solid var(--gris-300)", background:"#fff", color:"var(--gris-700)", fontSize:12.5, fontWeight:600, whiteSpace:"nowrap"}}>
+            ⬇️ Exportar backup
+          </button>
+          <label style={{padding:"8px 14px", borderRadius:8, border:"1px solid var(--gris-300)", background:"#fff", color:"var(--gris-700)", fontSize:12.5, fontWeight:600, whiteSpace:"nowrap", cursor:"pointer", display:"inline-block"}}>
+            ⬆️ Importar backup
+            <input type="file" accept="application/json" style={{display:"none"}}
+              onChange={e=>{ if(e.target.files[0]) importarBackup(e.target.files[0]); e.target.value=""; }} />
+          </label>
         </div>
 
         <div style={{display:"flex", gap:8, marginBottom:16, flexWrap:"wrap"}}>
