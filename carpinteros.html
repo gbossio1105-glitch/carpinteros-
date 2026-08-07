@@ -131,6 +131,17 @@ const MENSAJES_TERCER_CONTACTO = [
   {tipo:"whatsapp", texto:"Saludos"},
 ];
 
+// Pedido de datos fiscales para cargar al carpintero como cliente en el sistema.
+const MENSAJES_PEDIDO_DATOS = [
+  {tipo:"whatsapp", texto:"Para cargarte como cliente en el sistema, ¿me pasás estos datos?\n\nNombre y apellido o razón social:\nCondición de IVA: INSCRIPTO / MONOTRIBUTISTA / CONSUMIDOR FINAL\nCUIT:\nDomicilio:\nCódigo Postal:\nLocalidad:\nProvincia:\nE-mail:"},
+];
+
+// Aviso de que se va a viajar a la zona, para coordinar pedidos y ahorrar flete.
+// El saludo se agrega dinámicamente antes de este mensaje, igual que en Primer contacto.
+const MENSAJES_NOTIFICACION_VIAJE = [
+  {tipo:"whatsapp", texto:"Te avisamos que durante el transcurso de esta semana (o la próxima) estaremos viajando para la zona realizando entregas.\nSi necesitás algún herraje o accesorio, podés enviarnos tu pedido y lo preparamos para entregártelo durante el recorrido.\nQuedamos atentos. ¡Muchas gracias!"},
+];
+
 function saludoSegunHora(){
   const hora = new Date().getHours();
   if(hora >= 6 && hora < 12) return "Buenos días";
@@ -947,7 +958,7 @@ function ModalPrimerContacto({carpintero, onCerrar, onRegistrarEnvio}){
   const telefonos = carpintero.telefonos || [];
   const [telefonoElegido, setTelefonoElegido] = useState(telefonos[0]?.id || "");
   const [enviados, setEnviados] = useState(()=> new Set());
-  const [etapa, setEtapa] = useState("primero"); // "primero" | "segundo" | "tercero"
+  const [etapa, setEtapa] = useState("primero"); // "primero" | "segundo" | "tercero" | "datos" | "viaje"
 
   const telSeleccionado = telefonos.find(t=>t.id===telefonoElegido) || telefonos[0];
 
@@ -958,14 +969,23 @@ function ModalPrimerContacto({carpintero, onCerrar, onRegistrarEnvio}){
     ...MENSAJES_PRIMER_CONTACTO,
   ], []);
 
+  const mensajesViaje = useMemo(()=> [
+    {tipo:"whatsapp", texto: saludoSegunHora()},
+    ...MENSAJES_NOTIFICACION_VIAJE,
+  ], []);
+
   const mensajes = etapa==="primero" ? mensajesPrimero
     : etapa==="segundo" ? MENSAJES_SEGUNDO_CONTACTO
-    : MENSAJES_TERCER_CONTACTO;
+    : etapa==="tercero" ? MENSAJES_TERCER_CONTACTO
+    : etapa==="datos" ? MENSAJES_PEDIDO_DATOS
+    : mensajesViaje;
 
   const NOMBRE_ETAPA = {
     primero: "Primer contacto",
     segundo: "Segundo contacto",
     tercero: "Tercer contacto",
+    datos: "Datos solicitados",
+    viaje: "Notificación de viaje",
   };
 
   function abrirMensaje(index, texto){
@@ -1008,6 +1028,18 @@ function ModalPrimerContacto({carpintero, onCerrar, onRegistrarEnvio}){
               color: etapa==="tercero" ? "var(--azul-600)" : "var(--gris-500)",
               borderBottom: etapa==="tercero" ? "2px solid var(--azul-600)" : "2px solid transparent"}}>
             3️⃣ Le interesa Bronzen
+          </button>
+          <button onClick={()=>setEtapa("datos")}
+            style={{flex:"1 1 auto", padding:"9px 4px", border:"none", background:"none", fontSize:12.5, fontWeight:600,
+              color: etapa==="datos" ? "var(--azul-600)" : "var(--gris-500)",
+              borderBottom: etapa==="datos" ? "2px solid var(--azul-600)" : "2px solid transparent"}}>
+            📋 Pedido de datos
+          </button>
+          <button onClick={()=>setEtapa("viaje")}
+            style={{flex:"1 1 auto", padding:"9px 4px", border:"none", background:"none", fontSize:12.5, fontWeight:600,
+              color: etapa==="viaje" ? "var(--azul-600)" : "var(--gris-500)",
+              borderBottom: etapa==="viaje" ? "2px solid var(--azul-600)" : "2px solid transparent"}}>
+            🚚 Notificación de viaje
           </button>
         </div>
 
@@ -1056,7 +1088,7 @@ function ModalPrimerContacto({carpintero, onCerrar, onRegistrarEnvio}){
 
 function ModalEnvioMasivo({carpinteros, onRegistrarEnvio, onCerrar}){
   const [indice, setIndice] = useState(0);
-  const [etapa, setEtapa] = useState("primero"); // "primero" | "segundo" | "tercero"
+  const [etapa, setEtapa] = useState("primero"); // "primero" | "segundo" | "tercero" | "viaje"
   const [enviados, setEnviados] = useState(()=> new Set()); // claves: "carpinteroId_etapa_mensajeIndex"
 
   const carpintero = carpinteros[indice];
@@ -1067,14 +1099,21 @@ function ModalEnvioMasivo({carpinteros, onRegistrarEnvio, onCerrar}){
     ...MENSAJES_PRIMER_CONTACTO,
   ], []);
 
+  const mensajesViaje = useMemo(()=> [
+    {tipo:"whatsapp", texto: saludoSegunHora()},
+    ...MENSAJES_NOTIFICACION_VIAJE,
+  ], []);
+
   const mensajes = etapa==="primero" ? mensajesPrimero
     : etapa==="segundo" ? MENSAJES_SEGUNDO_CONTACTO
-    : MENSAJES_TERCER_CONTACTO;
+    : etapa==="tercero" ? MENSAJES_TERCER_CONTACTO
+    : mensajesViaje;
 
   const NOMBRE_ETAPA = {
     primero: "Primer contacto",
     segundo: "Segundo contacto",
     tercero: "Tercer contacto",
+    viaje: "Notificación de viaje",
   };
 
   function claveEnviado(i){ return `${carpintero.id}_${etapa}_${i}`; }
@@ -1137,6 +1176,12 @@ function ModalEnvioMasivo({carpinteros, onRegistrarEnvio, onCerrar}){
               color: etapa==="tercero" ? "var(--azul-600)" : "var(--gris-500)",
               borderBottom: etapa==="tercero" ? "2px solid var(--azul-600)" : "2px solid transparent"}}>
             3️⃣ Le interesa Bronzen
+          </button>
+          <button onClick={()=>setEtapa("viaje")}
+            style={{flex:"1 1 auto", padding:"9px 4px", border:"none", background:"none", fontSize:12.5, fontWeight:600,
+              color: etapa==="viaje" ? "var(--azul-600)" : "var(--gris-500)",
+              borderBottom: etapa==="viaje" ? "2px solid var(--azul-600)" : "2px solid transparent"}}>
+            🚚 Notificación de viaje
           </button>
         </div>
 
