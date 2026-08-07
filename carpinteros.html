@@ -136,11 +136,24 @@ const MENSAJES_PEDIDO_DATOS = [
   {tipo:"whatsapp", texto:"Para cargarte como cliente en el sistema, ¿me pasás estos datos?\n\nNombre y apellido o razón social:\nCondición de IVA: INSCRIPTO / MONOTRIBUTISTA / CONSUMIDOR FINAL\nCUIT:\nDomicilio:\nCódigo Postal:\nLocalidad:\nProvincia:\nE-mail:"},
 ];
 
-// Aviso de que se va a viajar a la zona, para coordinar pedidos y ahorrar flete.
-// El saludo se agrega dinámicamente antes de este mensaje, igual que en Primer contacto.
-const MENSAJES_NOTIFICACION_VIAJE = [
-  {tipo:"whatsapp", texto:"Te avisamos que durante el transcurso de esta semana (o la próxima) estaremos viajando para la zona realizando entregas.\nSi necesitás algún herraje o accesorio, podés enviarnos tu pedido y lo preparamos para entregártelo durante el recorrido.\nQuedamos atentos. ¡Muchas gracias!"},
-];
+const DIAS_SEMANA = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes"];
+
+// Arma el texto de "cuándo" para el mensaje de notificación de viaje, según la
+// opción elegida: si es "esta_semana" con días puntuales seleccionados, los
+// lista de forma natural (ej: "el martes y miércoles"); si es "semana_que_viene",
+// queda genérico.
+function armarCuandoViaje(modo, diasElegidos){
+  if(modo === "semana_que_viene") return "la semana que viene";
+  if(!diasElegidos || diasElegidos.length === 0) return "esta semana";
+  const dias = diasElegidos.map(d => d.toLowerCase());
+  if(dias.length === 1) return `el ${dias[0]}`;
+  return `el ${dias.slice(0,-1).join(", ")} y ${dias[dias.length-1]}`;
+}
+
+function mensajeNotificacionViaje(modo, diasElegidos){
+  const cuando = armarCuandoViaje(modo, diasElegidos);
+  return `Te avisamos que ${cuando} estaremos viajando para la zona realizando entregas.\nSi necesitás algún herraje o accesorio, podés enviarnos tu pedido y lo preparamos para entregártelo durante el recorrido.\nQuedamos atentos. ¡Muchas gracias!`;
+}
 
 function saludoSegunHora(){
   const hora = new Date().getHours();
@@ -954,11 +967,53 @@ function ModalEventoMasivo({cantidad, onAplicar, onCerrar, comentariosPrevios}){
   );
 }
 
+function SelectorViaje({modo, setModo, diasElegidos, setDiasElegidos}){
+  function alternarDia(dia){
+    setDiasElegidos(prev => prev.includes(dia) ? prev.filter(d=>d!==dia) : [...prev, dia]);
+  }
+  return (
+    <div style={{background:"var(--azul-50)", border:"1px solid var(--azul-100)", borderRadius:10, padding:12, marginBottom:14}}>
+      <div style={{fontSize:12.5, fontWeight:600, color:"var(--gris-700)", marginBottom:8}}>¿Cuándo viajamos?</div>
+      <div style={{display:"flex", gap:8, marginBottom:10}}>
+        <button type="button" onClick={()=>setModo("esta_semana")}
+          style={{flex:1, padding:"8px", borderRadius:8, border: modo==="esta_semana" ? "none" : "1px solid var(--gris-300)",
+            background: modo==="esta_semana" ? "var(--azul-600)" : "#fff", color: modo==="esta_semana" ? "#fff" : "var(--gris-700)",
+            fontSize:12.5, fontWeight:600}}>
+          Esta semana
+        </button>
+        <button type="button" onClick={()=>setModo("semana_que_viene")}
+          style={{flex:1, padding:"8px", borderRadius:8, border: modo==="semana_que_viene" ? "none" : "1px solid var(--gris-300)",
+            background: modo==="semana_que_viene" ? "var(--azul-600)" : "#fff", color: modo==="semana_que_viene" ? "#fff" : "var(--gris-700)",
+            fontSize:12.5, fontWeight:600}}>
+          La semana que viene
+        </button>
+      </div>
+      {modo==="esta_semana" && (
+        <div>
+          <div style={{fontSize:11.5, color:"var(--gris-500)", marginBottom:6}}>Elegí uno o varios días:</div>
+          <div style={{display:"flex", gap:6, flexWrap:"wrap"}}>
+            {DIAS_SEMANA.map(dia=>(
+              <button key={dia} type="button" onClick={()=>alternarDia(dia)}
+                style={{padding:"6px 12px", borderRadius:20, border: diasElegidos.includes(dia) ? "none" : "1px solid var(--gris-300)",
+                  background: diasElegidos.includes(dia) ? "var(--verde-600)" : "#fff", color: diasElegidos.includes(dia) ? "#fff" : "var(--gris-700)",
+                  fontSize:12, fontWeight:600}}>
+                {dia}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ModalPrimerContacto({carpintero, onCerrar, onRegistrarEnvio}){
   const telefonos = carpintero.telefonos || [];
   const [telefonoElegido, setTelefonoElegido] = useState(telefonos[0]?.id || "");
   const [enviados, setEnviados] = useState(()=> new Set());
   const [etapa, setEtapa] = useState("primero"); // "primero" | "segundo" | "tercero" | "datos" | "viaje"
+  const [modoViaje, setModoViaje] = useState("esta_semana");
+  const [diasViaje, setDiasViaje] = useState([]);
 
   const telSeleccionado = telefonos.find(t=>t.id===telefonoElegido) || telefonos[0];
 
@@ -971,8 +1026,8 @@ function ModalPrimerContacto({carpintero, onCerrar, onRegistrarEnvio}){
 
   const mensajesViaje = useMemo(()=> [
     {tipo:"whatsapp", texto: saludoSegunHora()},
-    ...MENSAJES_NOTIFICACION_VIAJE,
-  ], []);
+    {tipo:"whatsapp", texto: mensajeNotificacionViaje(modoViaje, diasViaje)},
+  ], [modoViaje, diasViaje]);
 
   const mensajes = etapa==="primero" ? mensajesPrimero
     : etapa==="segundo" ? MENSAJES_SEGUNDO_CONTACTO
@@ -1052,6 +1107,10 @@ function ModalPrimerContacto({carpintero, onCerrar, onRegistrarEnvio}){
           </div>
         )}
 
+        {etapa==="viaje" && (
+          <SelectorViaje modo={modoViaje} setModo={setModoViaje} diasElegidos={diasViaje} setDiasElegidos={setDiasViaje} />
+        )}
+
         <p style={{fontSize:12.5, color:"var(--gris-500)", marginBottom:14}}>
           Tocá cada mensaje para abrirlo en WhatsApp ya cargado. Revisalo y tocá enviar allá. Después volvé acá para el siguiente.
         </p>
@@ -1090,6 +1149,8 @@ function ModalEnvioMasivo({carpinteros, onRegistrarEnvio, onCerrar}){
   const [indice, setIndice] = useState(0);
   const [etapa, setEtapa] = useState("primero"); // "primero" | "segundo" | "tercero" | "viaje"
   const [enviados, setEnviados] = useState(()=> new Set()); // claves: "carpinteroId_etapa_mensajeIndex"
+  const [modoViaje, setModoViaje] = useState("esta_semana");
+  const [diasViaje, setDiasViaje] = useState([]);
 
   const carpintero = carpinteros[indice];
   const telefono = carpintero?.telefonos?.[0]; // primer teléfono cargado, automático
@@ -1101,8 +1162,8 @@ function ModalEnvioMasivo({carpinteros, onRegistrarEnvio, onCerrar}){
 
   const mensajesViaje = useMemo(()=> [
     {tipo:"whatsapp", texto: saludoSegunHora()},
-    ...MENSAJES_NOTIFICACION_VIAJE,
-  ], []);
+    {tipo:"whatsapp", texto: mensajeNotificacionViaje(modoViaje, diasViaje)},
+  ], [modoViaje, diasViaje]);
 
   const mensajes = etapa==="primero" ? mensajesPrimero
     : etapa==="segundo" ? MENSAJES_SEGUNDO_CONTACTO
@@ -1184,6 +1245,10 @@ function ModalEnvioMasivo({carpinteros, onRegistrarEnvio, onCerrar}){
             🚚 Notificación de viaje
           </button>
         </div>
+
+        {etapa==="viaje" && (
+          <SelectorViaje modo={modoViaje} setModo={setModoViaje} diasElegidos={diasViaje} setDiasElegidos={setDiasViaje} />
+        )}
 
         {!telefono && (
           <div style={{background:"var(--rojo-50)", border:"1px solid var(--rojo-500)", borderRadius:10, padding:12, marginBottom:14, fontSize:13, color:"var(--rojo-700)"}}>
