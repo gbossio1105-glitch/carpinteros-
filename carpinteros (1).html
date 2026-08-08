@@ -1,0 +1,1708 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Carpinteros — AB Accesorios</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Carpinteros">
+<meta name="theme-color" content="#0a2540">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+  import { getFirestore, doc, getDoc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyCDTLUEF6LlTxqT-E8qVOugQZPs8FmxjGw",
+    authDomain: "carpinterossb.firebaseapp.com",
+    projectId: "carpinterossb",
+    storageBucket: "carpinterossb.firebasestorage.app",
+    messagingSenderId: "667317587912",
+    appId: "1:667317587912:web:aca573c371f9bdbbb53afd"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
+
+  // Exponemos estas funciones en window para que el script de React (que no
+  // es un módulo ES, así que no puede usar "import" directamente) las use.
+  window.__firestoreDb = db;
+  window.__firestoreDoc = doc;
+  window.__firestoreGetDoc = getDoc;
+  window.__firestoreSetDoc = setDoc;
+  window.__firestoreOnSnapshot = onSnapshot;
+  window.__firestoreReady = true;
+</script>
+<style>
+  :root{
+    --azul-900:#0a2540; --azul-800:#0e3661; --azul-700:#134a86; --azul-600:#1a5fa8;
+    --azul-500:#2b7bd1; --azul-100:#e5f0fb; --azul-50:#f2f8fd;
+    --gris-900:#1c2430; --gris-700:#48505c; --gris-500:#7a8290; --gris-300:#cdd3db;
+    --gris-100:#eef1f5; --gris-50:#f7f9fb;
+    --verde-600:#1c8a5b; --verde-100:#e2f5ec;
+    --rojo-600:#c23b3b; --rojo-100:#fbe8e8;
+    --ambar-600:#b8790f; --ambar-100:#fdf1de;
+    --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html{-webkit-text-size-adjust:100%;}
+  body{margin:0; font-family:var(--font-sans); background:var(--gris-50); color:var(--gris-900); overscroll-behavior-y:contain;}
+  ::-webkit-scrollbar{width:8px; height:8px;}
+  ::-webkit-scrollbar-thumb{background:var(--gris-300); border-radius:4px;}
+  button{font-family:inherit; cursor:pointer; touch-action:manipulation;}
+  input, select, textarea{font-family:inherit; font-size:16px;}
+  #root{min-height:100vh; min-height:100dvh;}
+  @supports (padding: max(0px)){
+    body{ padding-left: env(safe-area-inset-left); padding-right: env(safe-area-inset-right); }
+  }
+  @media (max-width:600px){
+    .modal-overlay{ align-items:flex-end !important; padding:0 !important; }
+    .modal-box{ padding:18px 16px !important; max-height:94vh !important; max-height:94dvh !important; border-radius:16px 16px 0 0 !important; width:100% !important; }
+    .fila-campos{ flex-direction:column !important; gap:0 !important; }
+    .fila-campos > div{ margin-bottom:14px; }
+  }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel" data-presets="react">
+
+const { useState, useEffect, useMemo, useCallback } = React;
+
+const SEED_CARPINTEROS = [{"nombre": "ACOSTA CARLOS DANIEL", "domicilio": "CHACRA 41 MANZANº4 PC 35", "localidad": "CASTELLI", "provincia": "CHACO", "telefono": "3644412141", "ruta": "Ruta Nacional 95"}, {"nombre": "ADOR MARCELO", "domicilio": "COLOMBIA 1547", "localidad": "SAN FRANCISCO", "provincia": "CORDOBA", "telefono": "3564510034", "ruta": "San Francisco"}, {"nombre": "AIMAR VICTOR", "domicilio": "SAN JUAN 1366", "localidad": "SAN FRANCISCO", "provincia": "CORDOBA", "telefono": "3564583657", "ruta": "San Francisco"}, {"nombre": "ALEJANDRO PINDADO", "domicilio": "", "localidad": "SAN FRANCISCO", "provincia": "CORDOBA", "telefono": "3564577359", "ruta": "San Francisco"}, {"nombre": "ALESSANDRIA EMILIANO", "domicilio": "INT CURTO 826 / MITRE 855", "localidad": "PORTEÑA", "provincia": "CORDOBA", "telefono": "3564638351", "ruta": "Ruta Provincial 1 (Córdoba)"}, {"nombre": "ALESSANDRIA FABIAN", "domicilio": "FALUCHO 181", "localidad": "LA PAQUITA", "provincia": "CORDOBA", "telefono": "3562509368", "ruta": "Ruta Provincial 17"}, {"nombre": "AMAYA DARIO", "domicilio": "MAIPU ESQ MIRANDA", "localidad": "LUQUE", "provincia": "CORDOBA", "telefono": "3573496026", "ruta": "Ruta Provincial 13 (Córdoba)"}, {"nombre": "AMOBLAMIENTO CHICOO (OMAR CHICOO )", "domicilio": "RIVADAVIA Y SARMIENTO", "localidad": "PORTEÑA", "provincia": "CORDOBA", "telefono": "3564621402", "ruta": "Ruta Provincial 1 (Córdoba)"}, {"nombre": "AMOBLAMIENTO ROOM BOBBONI CINTIA", "domicilio": "FALUCHO 2077", "localidad": "SAN JORGE", "provincia": "SANTA FE", "telefono": "3406645918", "ruta": "Ruta Provincial 13 (Santa Fe)"}, {"nombre": "AMOBLAMIENTOS GIORDANO MARIANO", "domicilio": "GENERAL LOPEZ 635", "localidad": "C.ROSQUIN", "provincia": "SANTA FE", "telefono": "3401-592474", "ruta": "Ruta Nacional 34"}, {"nombre": "BARTOLI HNOS", "domicilio": "COLON 649", "localidad": "MORTEROS", "provincia": "CORDOBA", "telefono": "3562-519814-445809", "ruta": "Ruta Provincial 1 (Córdoba)"}, {"nombre": "BITSCHIN CESAR", "domicilio": "ANTONIO BALLATORE 1635", "localidad": "ARROYITO", "provincia": "CORDOBA", "telefono": "3576650114", "ruta": "Ruta Nacional 19"}, {"nombre": "BONANCEA RUBEN", "domicilio": "CHACABUCO 2054", "localidad": "SASTRE", "provincia": "SANTA FE", "telefono": "3406517753", "ruta": "Ruta Provincial 13 (Santa Fe)"}, {"nombre": "BOSETTI DANTE AMOBLAMIENTOS", "domicilio": "BARTOLOME MITRE 1260", "localidad": "ARROYITO", "provincia": "CORDOBA", "telefono": "3576-653162", "ruta": "Ruta Nacional 19"}, {"nombre": "BOSETTI WALTER CARPINTERIA", "domicilio": "VICENTE ORELLANO 1010", "localidad": "ARROYITO", "provincia": "CORDOBA", "telefono": "3576-479221", "ruta": "Ruta Nacional 19"}, {"nombre": "BRUNO AMOBLAMIENTOS ( DANIEL )", "domicilio": "IRIGOYEN 256", "localidad": "LAS VARILLAS", "provincia": "CORDOBA", "telefono": "3533-440202- 4401110", "ruta": "Ruta 158"}, {"nombre": "BUFFA ISMAEL CARLOS", "domicilio": "RICHIERI 1311", "localidad": "SASTRE", "provincia": "SANTA FE", "telefono": "3406426714", "ruta": "Ruta Provincial 13 (Santa Fe)"}, {"nombre": "CARPINTERIA CAPTAR (HIDALGO EZEQUIEL)", "domicilio": "LAS HERAS 654", "localidad": "BRINKMANN", "provincia": "CORDOBA", "telefono": "3562505235", "ruta": "Ruta Provincial 1 (Córdoba)"}, {"nombre": "CARPINTERIA CORRA (PEDRUEZA DEMIAN )", "domicilio": "SAN JUAN Y SARMIENTO", "localidad": "BRINKMANN", "provincia": "CORDOBA", "telefono": "3562-412810-564929-481335", "ruta": "Ruta Provincial 1 (Córdoba)"}, {"nombre": "CARPINTERIA DISEÑO (JOSE L CORDOBA )", "domicilio": "J NEWVERY 845", "localidad": "MORTEROS", "provincia": "CORDOBA", "telefono": "3562514576 - 3925238602", "ruta": "Ruta Provincial 1 (Córdoba)"}, {"nombre": "CARPINTERIA GUIZZO (DARIO Y RUBEN )", "domicilio": "VELEZ SARFIELD 613", "localidad": "ARROYITO", "provincia": "CORDOBA", "telefono": "3576-447906- 466384", "ruta": "Ruta Nacional 19"}, {"nombre": "CARPINTERIA LA IDEAL", "domicilio": "PTE PERON 799", "localidad": "SAN JORGE", "provincia": "SANTA FE", "telefono": "3406-418543-504971", "ruta": "Ruta Provincial 13 (Santa Fe)"}, {"nombre": "CARPINTERIA OVIEDO (LALO) EDUARDO", "domicilio": "CHACO 170", "localidad": "BELL VILLE", "provincia": "CORDOBA", "telefono": "3537448571", "ruta": "Ruta Nacional 9"}, {"nombre": "CARPINTERIA RAMIREZ", "domicilio": "GUEMES 70", "localidad": "LEONES", "provincia": "CORDOBA", "telefono": "3472-500246", "ruta": "Ruta Nacional 9"}, {"nombre": "CARPINTERIA REVESTIMIENTO (GIECCO- GOTARDI )", "domicilio": "EVA PERON Y SARMIENTO", "localidad": "BRINKMANN", "provincia": "CORDOBA", "telefono": "3562-444318-569479", "ruta": "Ruta Provincial 1 (Córdoba)"}, {"nombre": "CASATEC S. A.", "domicilio": "BV. SANTA FE 931", "localidad": "ALICIA", "provincia": "CORDOBA", "telefono": "3533419164", "ruta": "Ruta Provincial 13 (Córdoba)"}, {"nombre": "CASTELARI RENE", "domicilio": "RIOJA 1253", "localidad": "SAN FRANCISCO", "provincia": "CORDOBA", "telefono": "3564569695", "ruta": "San Francisco"}, {"nombre": "CASTELARI ROBERTO CARLOS", "domicilio": "DR MANUEL BELGRANO 124", "localidad": "LUQUE", "provincia": "CORDOBA", "telefono": "", "ruta": "Ruta Provincial 13 (Córdoba)"}, {"nombre": "CHIAVASSA MAURICIO", "domicilio": "JUAN DIAZ DE SOLIS 2417", "localidad": "SAN FRANCISCO", "provincia": "CORDOBA", "telefono": "3564644070", "ruta": "San Francisco"}, {"nombre": "CUBERLI  FABIAN", "domicilio": "LAS HERAS 745", "localidad": "MORTEROS", "provincia": "CORDOBA", "telefono": "3562416475", "ruta": "Ruta Provincial 1 (Córdoba)"}, {"nombre": "CUGGINO SERGIO", "domicilio": "NO ESPECIFICADO", "localidad": "LAS VARILLAS", "provincia": "CORDOBA", "telefono": "", "ruta": "Ruta 158"}, {"nombre": "DURAN EMILIANO ARIEL", "domicilio": "RIVADAVIA 385", "localidad": "LUQUE", "provincia": "CORDOBA", "telefono": "3573433589", "ruta": "Ruta Provincial 13 (Córdoba)"}, {"nombre": "ENGELHARDT MATIAS", "domicilio": "ARTURO ILLIA 331", "localidad": "HERMOSO CAMPO", "provincia": "CHACO", "telefono": "3735456078", "ruta": "Sin clasificar"}, {"nombre": "FAVETTO HORACIO", "domicilio": "MARCONI 466", "localidad": "SAN FRANCISCO", "provincia": "CORDOBA", "telefono": "434381", "ruta": "San Francisco"}, {"nombre": "FERACE EZEQUIEL CARPINTERIA", "domicilio": "TOMAS JUAREZ 1028 Y RIVADAVIA", "localidad": "ARROYITO", "provincia": "CORDOBA", "telefono": "3576-482445", "ruta": "Ruta Nacional 19"}, {"nombre": "FERRATO ANDRES EDUARDO", "domicilio": "ESQUIU 46", "localidad": "LUQUE", "provincia": "CORDOBA", "telefono": "3573514961", "ruta": "Ruta Provincial 13 (Córdoba)"}, {"nombre": "FERRERO MARCELO", "domicilio": "GUTIERREZ 2451", "localidad": "SAN FRANCISCO", "provincia": "CORDOBA", "telefono": "3564415237", "ruta": "San Francisco"}, {"nombre": "GOMEZ DANIEL", "domicilio": "JOSE VOCOS 1141", "localidad": "ARROYITO", "provincia": "CORDOBA", "telefono": "3576-448054", "ruta": "Ruta Nacional 19"}, {"nombre": "GUIÑANES DIEGO (CARPINTERIA D C )", "domicilio": "BUENOS AIRES 1149", "localidad": "ALICIA", "provincia": "CORDOBA", "telefono": "3533689972", "ruta": "Ruta Provincial 13 (Córdoba)"}, {"nombre": "HANG GABRIEL", "domicilio": "PUEYRREDON 871", "localidad": "SAN FRANCISCO", "provincia": "CORDOBA", "telefono": "3564371962", "ruta": "San Francisco"}, {"nombre": "MIRETTI FABIAN", "domicilio": "CARLOS MALDINI 740", "localidad": "ARROYITO", "provincia": "CORDOBA", "telefono": "3576-472917", "ruta": "Ruta Nacional 19"}, {"nombre": "MORALES DARIO", "domicilio": "O. HERRERA", "localidad": "BELL VILLE", "provincia": "CORDOBA", "telefono": "3537444372", "ruta": "Ruta Nacional 9"}, {"nombre": "MOTTURA MARCELO DANIEL", "domicilio": "SAN LORENZO ESQ 12 OCTUBRE", "localidad": "SAN GUILLERMO", "provincia": "SANTA FE", "telefono": "3424303613", "ruta": "Ruta Provincial 23 (Santa Fe)"}, {"nombre": "MUEBLES MODERNOS MELAMINA ( CLAUDIO VERA)", "domicilio": "GRAL SAVIO 703", "localidad": "SAN FRANCISCO", "provincia": "CORDOBA", "telefono": "3564604119", "ruta": "San Francisco"}, {"nombre": "ORELLANO ROBERTO", "domicilio": "GABOTO 375", "localidad": "SAN FRANCISCO", "provincia": "CORDOBA", "telefono": "3564592517", "ruta": "San Francisco"}, {"nombre": "PERRONE FABRICIO", "domicilio": "CELESTINO 107", "localidad": "LASPIUR", "provincia": "CORDOBA", "telefono": "3533459956", "ruta": "Ruta 158"}, {"nombre": "PODEWILS  DARIO", "domicilio": "BV 25 DE MAYO 1059", "localidad": "SAN JORGE", "provincia": "SANTA FE", "telefono": "3406-456306", "ruta": "Ruta Provincial 13 (Santa Fe)"}, {"nombre": "RACCA MATIAS", "domicilio": "CORRIENTES 264", "localidad": "PORTEÑA", "provincia": "CORDOBA", "telefono": "3564-652349-504220", "ruta": "Ruta Provincial 1 (Córdoba)"}, {"nombre": "REARTE GUSTAVO", "domicilio": "COLON Y PELEGRINI", "localidad": "MORTEROS", "provincia": "CORDOBA", "telefono": "3562513479", "ruta": "Ruta Provincial 1 (Córdoba)"}, {"nombre": "REARTE MARCELO", "domicilio": "AYACUCHO Y GUEMES", "localidad": "MORTEROS", "provincia": "CORDOBA", "telefono": "3562436984", "ruta": "Ruta Provincial 1 (Córdoba)"}, {"nombre": "REBOLA NORBERTO", "domicilio": "ACCESO RUTA 13", "localidad": "SASTRE", "provincia": "SANTA FE", "telefono": "3406562278", "ruta": "Ruta Provincial 13 (Santa Fe)"}, {"nombre": "RUATTA ARIEL (LALO)", "domicilio": "RUTA 23", "localidad": "SUARDI", "provincia": "SANTA FE", "telefono": "3562444533", "ruta": "Ruta Provincial 23 (Santa Fe)"}, {"nombre": "STICOTTI DIEGO", "domicilio": "25 DE MAYO 419", "localidad": "LA FRANCIA", "provincia": "CORDOBA", "telefono": "3564574179", "ruta": "Ruta Nacional 19"}, {"nombre": "SUPPICICH ARIEL", "domicilio": "GRAL PAZ 1878", "localidad": "ARROYITO", "provincia": "CORDOBA", "telefono": "3576-448054", "ruta": "Ruta Nacional 19"}, {"nombre": "VARAS WALTER", "domicilio": "MAIPU ESQUINA MIRANDA", "localidad": "LUQUE", "provincia": "CORDOBA", "telefono": "3573415588", "ruta": "Ruta Provincial 13 (Córdoba)"}, {"nombre": "CARPINTERIA EL SANAVIRON (LUIS NOVARINO)", "domicilio": "", "localidad": "LA PARA", "provincia": "CORDOBA", "telefono": "03575656013", "ruta": "Ruta Provincial 17"}, {"nombre": "FONTANA AMOBLAMIENTOS", "domicilio": "AV. PRESIDENTE ARTURO ILLIA Y LA HABANA", "localidad": "RIO TERCERO", "provincia": "CORDOBA", "telefono": "03571616257", "ruta": "Ruta Provincial 6"}, {"nombre": "CARPINTERIA SAN JAVIER (FERNANDO PEREZ)", "domicilio": "", "localidad": "RIO PRIMERO", "provincia": "CORDOBA", "telefono": "3574435978", "ruta": "Ruta Nacional 19"}, {"nombre": "DECO EN MADERAS", "domicilio": "", "localidad": "RIO PRIMERO", "provincia": "CORDOBA", "telefono": "03513274969", "ruta": "Ruta Nacional 19"}, {"nombre": "EL RUSTICO - MUEBLES E INMUEBLES", "domicilio": "", "localidad": "SANTIAGO TEMPLE", "provincia": "CORDOBA", "telefono": "2995043695", "ruta": "Ruta Nacional 19"}, {"nombre": "ENCANTO CARPINTERIA", "domicilio": "", "localidad": "TRANSITO", "provincia": "CORDOBA", "telefono": "03576412657", "ruta": "Ruta Nacional 19"}, {"nombre": "B&H CARPINTERIA DE PINO ARROYITO", "domicilio": "VELEZ SARSFIELD 1328", "localidad": "ARROYITO", "provincia": "CORDOBA", "telefono": "03576406007", "ruta": "Ruta Nacional 19"}, {"nombre": "CARPINTERIA CONTRERAS", "domicilio": "DALLE MURA 1433", "localidad": "ARROYITO", "provincia": "CORDOBA", "telefono": "03576576199", "ruta": "Ruta Nacional 19"}, {"nombre": "CARPINTERIA RONCO", "domicilio": "", "localidad": "ARROYITO", "provincia": "CORDOBA", "telefono": "3576468865", "ruta": "Ruta Nacional 19"}, {"nombre": "BERACA MADERAS", "domicilio": "", "localidad": "ARROYITO", "provincia": "CORDOBA", "telefono": "03576155255154", "ruta": "Ruta Nacional 19"}, {"nombre": "MUEBLES EL POLACO", "domicilio": "AV. INDEPENDENCIA 820", "localidad": "EL TIO", "provincia": "CORDOBA", "telefono": "03576470516", "ruta": "Ruta Nacional 19"}, {"nombre": "CARPINTERIA FRANCO", "domicilio": "DEAN FUNES 2374", "localidad": "SAN FRANCISCO", "provincia": "CORDOBA", "telefono": "03564523398", "ruta": "San Francisco"}, {"nombre": "VIEJO ROBLE CARPINTERIA INTEGRAL", "domicilio": "", "localidad": "LA FRANCIA", "provincia": "CORDOBA", "telefono": "3516975406", "ruta": "Ruta Nacional 19"}, {"nombre": "CARPINTERIA FERREYRA", "domicilio": "BLVD. L. N. ALEM 98", "localidad": "DEVOTO", "provincia": "CORDOBA", "telefono": "5493564240735", "ruta": "Ruta Nacional 19"}, {"nombre": "CENTRO MADERERO DEVOTO", "domicilio": "", "localidad": "DEVOTO", "provincia": "CORDOBA", "telefono": "03564384832", "ruta": "Ruta Nacional 19"}, {"nombre": "MUEBLES KEMUEL", "domicilio": "LOPEZ Y PLANES 953", "localidad": "DEVOTO", "provincia": "CORDOBA", "telefono": "3564525156-3564517105", "ruta": "Ruta Nacional 19"}, {"nombre": "SAN JOSE MUEBLES", "domicilio": "25 DE MAYO 339", "localidad": "DEVOTO", "provincia": "CORDOBA", "telefono": "03564481249-03564481166-03564156313000", "ruta": "Ruta Nacional 19"}, {"nombre": "CARPINTERIA TORASSA", "domicilio": "LINIERS 370", "localidad": "SAN VICENTE", "provincia": "SANTA FE", "telefono": "3492621934", "ruta": "Ruta Nacional 34"}, {"nombre": "CARPINTERIA JULIO BODINI", "domicilio": "LEANDRO N. ALEM 151", "localidad": "SAN VICENTE", "provincia": "SANTA FE", "telefono": "3492669932", "ruta": "Ruta Nacional 34"}, {"nombre": "CARPINTERIA BORGHINO", "domicilio": "JUAN DOMINGO PERON", "localidad": "SAN MARTIN DE LAS ESCOBAS", "provincia": "SANTA FE", "telefono": "", "ruta": "Ruta Nacional 34"}, {"nombre": "CARPINTERIA DEL CAS", "domicilio": "LISANDRO DE LA TORRE 1001", "localidad": "SAN MARTIN DE LAS ESCOBAS", "provincia": "SANTA FE", "telefono": "3406422967", "ruta": "Ruta Nacional 34"}, {"nombre": "CARPINTERIA DEICAS", "domicilio": "BELGRANO 1122", "localidad": "SAN MARTIN DE LAS ESCOBAS", "provincia": "SANTA FE", "telefono": "", "ruta": "Ruta Nacional 34"}, {"nombre": "CARPINTERIA BRIGNONE", "domicilio": "ESPAÑA", "localidad": "MARIA JUANA", "provincia": "SANTA FE", "telefono": "3406472337", "ruta": "Ruta Provincial 13 (Santa Fe)"}, {"nombre": "SERVICIOS INTEGRALES MJ", "domicilio": "9 DE JULIO 69", "localidad": "MARIA JUANA", "provincia": "SANTA FE", "telefono": "3406429172", "ruta": "Ruta Provincial 13 (Santa Fe)"}, {"nombre": "ABERTURAS CROCCE", "domicilio": "AV. GRAL. SAN MARTIN 1541", "localidad": "SASTRE", "provincia": "SANTA FE", "telefono": "3406480320", "ruta": "Ruta Provincial 13 (Santa Fe)"}, {"nombre": "PAZ MUEBLES", "domicilio": "JORGE ORTIZ 1779", "localidad": "SASTRE", "provincia": "SANTA FE", "telefono": "3406481008", "ruta": "Ruta Provincial 13 (Santa Fe)"}, {"nombre": "PLASTINO MUEBLES", "domicilio": "AV. GRAL. SAN MARTIN 1766", "localidad": "SASTRE", "provincia": "SANTA FE", "telefono": "3406480245", "ruta": "Ruta Provincial 13 (Santa Fe)"}, {"nombre": "CARPINTERIA SANTI", "domicilio": "SANTA FE 1016", "localidad": "SAN JORGE", "provincia": "SANTA FE", "telefono": "3406437261", "ruta": "Ruta Provincial 13 (Santa Fe)"}, {"nombre": "LUCIANO AMOBLAMIENTOS", "domicilio": "FRAY LUIS BELTRAN 1372", "localidad": "SAN JORGE", "provincia": "SANTA FE", "telefono": "3406443061", "ruta": "Ruta Provincial 13 (Santa Fe)"}, {"nombre": "MOTTA MADERAS Y DECORACIONES S.R.L", "domicilio": "SANTA FE 2066", "localidad": "SAN JORGE", "provincia": "SANTA FE", "telefono": "3406440976", "ruta": "Ruta Provincial 13 (Santa Fe)"}, {"nombre": "FB MADERAS Y PINTURAS SRL", "domicilio": "BLVD. PRES. PERON 950", "localidad": "SAN JORGE", "provincia": "SANTA FE", "telefono": "3406405800", "ruta": "Ruta Provincial 13 (Santa Fe)"}, {"nombre": "COMERCIAL MADERAS", "domicilio": "MITRE 965", "localidad": "CARLOS PELLEGRINI", "provincia": "SANTA FE", "telefono": "", "ruta": "Ruta Provincial 13 (Santa Fe)"}, {"nombre": "SISTEMA MOBILIARIO AICHINO", "domicilio": "SAN MARTIN 922", "localidad": "CARLOS PELLEGRINI", "provincia": "SANTA FE", "telefono": "3401590849", "ruta": "Ruta Provincial 13 (Santa Fe)"}, {"nombre": "BORDIGONI HNOS S.A.", "domicilio": "VELEZ SARSFIELD 599", "localidad": "CARLOS PELLEGRINI", "provincia": "SANTA FE", "telefono": "3401480310", "ruta": "Ruta Provincial 13 (Santa Fe)"}, {"nombre": "VIENA MUEBLES Y HOGAR", "domicilio": "MARCOS PAZ 590", "localidad": "CARLOS PELLEGRINI", "provincia": "SANTA FE", "telefono": "3401481301", "ruta": "Revisar: Mueblería"}, {"nombre": "HORIZONTE MADERERA (JUAN JOSE COSTAGRANDE)", "domicilio": "J.F. SEGUI 16", "localidad": "EL TREBOL", "provincia": "SANTA FE", "telefono": "3401419880", "ruta": "Ruta Provincial 13 (Santa Fe)"}, {"nombre": "PAULONE ABERTURAS", "domicilio": "ENTRE RIOS 828", "localidad": "EL TREBOL", "provincia": "SANTA FE", "telefono": "3401417214", "ruta": "Ruta Provincial 13 (Santa Fe)"}, {"nombre": "BERTOLA MUEBLES", "domicilio": "J.F. SEGUI 299", "localidad": "EL TREBOL", "provincia": "SANTA FE", "telefono": "3401406203", "ruta": "Ruta Provincial 13 (Santa Fe)"}, {"nombre": "VIENA, MUEBLES Y HOGAR", "domicilio": "VIENA 386", "localidad": "EL TREBOL", "provincia": "SANTA FE", "telefono": "3401420607", "ruta": "Revisar: Mueblería"}, {"nombre": "IDEAL - TIENDA DE MUEBLES, COLCHONES Y SILLONES", "domicilio": "ITALIA 816", "localidad": "EL TREBOL", "provincia": "SANTA FE", "telefono": "3406514068", "ruta": "Revisar: Mueblería"}, {"nombre": "KAESE - HIERRO Y MADERA", "domicilio": "CERRITO 352", "localidad": "LAS ROSAS", "provincia": "SANTA FE", "telefono": "3471586809", "ruta": "Ruta Nacional 34"}, {"nombre": "MG AMOBLAMIENTOS", "domicilio": "JUAN JOSE PASO 1408", "localidad": "LAS ROSAS", "provincia": "SANTA FE", "telefono": "", "ruta": "Ruta Nacional 34"}, {"nombre": "CONFORT MUEBLES", "domicilio": "GUILLERMO BENITZ 97", "localidad": "LAS ROSAS", "provincia": "SANTA FE", "telefono": "3471589881", "ruta": "Revisar: Mueblería"}, {"nombre": "MUEBLES MEDITERRANEA", "domicilio": "SALTA 873", "localidad": "LAS ROSAS", "provincia": "SANTA FE", "telefono": "", "ruta": "Revisar: Mueblería"}, {"nombre": "SA INTERNACIONAL S.A.", "domicilio": "AVENIDA DICKINSON 1150", "localidad": "LAS ROSAS", "provincia": "SANTA FE", "telefono": "", "ruta": "Ruta Nacional 34"}, {"nombre": "CARPINTERIA VIOTTI", "domicilio": "EROS JUAN A. FARAUDELLO 1313", "localidad": "RAFAELA", "provincia": "SANTA FE", "telefono": "3492661603", "ruta": "Ruta Nacional 34"}, {"nombre": "CARPINTERIA CIPOLATTI", "domicilio": "CORDOBA 605", "localidad": "RAFAELA", "provincia": "SANTA FE", "telefono": "3492428225", "ruta": "Ruta Nacional 34"}, {"nombre": "MMF CARPINTERIA", "domicilio": "AGUADO Y PAUL HARRIS", "localidad": "RAFAELA", "provincia": "SANTA FE", "telefono": "3492601458", "ruta": "Ruta Nacional 34"}, {"nombre": "CARPINTERIA MANERO", "domicilio": "B. OLIVERO 561", "localidad": "RAFAELA", "provincia": "SANTA FE", "telefono": "", "ruta": "Ruta Nacional 34"}, {"nombre": "ADORNI MUEBLES FABRICANTES", "domicilio": "AV. ITALIA 303", "localidad": "RAFAELA", "provincia": "SANTA FE", "telefono": "3492425136", "ruta": "Ruta Nacional 34"}, {"nombre": "ORIGINARIO - MUEBLES INFANTILES DE MADERA", "domicilio": "GRAL. PAZ 950", "localidad": "RAFAELA", "provincia": "SANTA FE", "telefono": "3492614727", "ruta": "Ruta Nacional 34"}, {"nombre": "EMC FABRICA ARGENTINA DE MUEBLES", "domicilio": "SIMONETTA 487", "localidad": "RAFAELA", "provincia": "SANTA FE", "telefono": "3492214136", "ruta": "Ruta Nacional 34"}, {"nombre": "MADERAL SA", "domicilio": "SYLVESTRE BEGNIS 2275", "localidad": "RAFAELA", "provincia": "SANTA FE", "telefono": "3492570606", "ruta": "Ruta Nacional 34"}, {"nombre": "CARPINTERIA RUBEN", "domicilio": "SAN LUIS 538", "localidad": "SUNCHALES", "provincia": "SANTA FE", "telefono": "", "ruta": "Ruta Nacional 34"}, {"nombre": "MOBEL SOLUCIONES", "domicilio": "PUEYRREDON 555 / RICARDO BALBIN 501", "localidad": "SUNCHALES", "provincia": "SANTA FE", "telefono": "3493417841", "ruta": "Ruta Nacional 34"}, {"nombre": "PRESISSO SUNCHALES", "domicilio": "AV. HIPOLITO YRIGOYEN 1206", "localidad": "SUNCHALES", "provincia": "SANTA FE", "telefono": "3493417902", "ruta": "Ruta Nacional 34"}, {"nombre": "MUEBLES DEL CENTRO", "domicilio": "AV. HIPOLITO YRIGOYEN 852 (SHOWROOM MITRI 1143)", "localidad": "SUNCHALES", "provincia": "SANTA FE", "telefono": "3493664269", "ruta": "Revisar: Mueblería"}, {"nombre": "ESCHBACH MUEBLES", "domicilio": "SAN JUAN 1995", "localidad": "SUNCHALES", "provincia": "SANTA FE", "telefono": "3492615904", "ruta": "Ruta Nacional 34"}, {"nombre": "MADERERA EL CACHORRO", "domicilio": "TTE. GRAL. RICCHIERI", "localidad": "SUNCHALES", "provincia": "SANTA FE", "telefono": "3493426064", "ruta": "Ruta Nacional 34"}, {"nombre": "CARPINTERIA Y AMOBLAMIENTOS GUILLERMO GIUSTINA", "domicilio": "BV. 25 DE MAYO 740", "localidad": "FREYRE", "provincia": "CORDOBA", "telefono": "3564461215", "ruta": "Ruta Provincial 1 (Córdoba)"}, {"nombre": "CARPINTERIA RITTINER", "domicilio": "ITURRASPE 945", "localidad": "FREYRE", "provincia": "CORDOBA", "telefono": "3564461502", "ruta": "Ruta Provincial 1 (Córdoba)"}, {"nombre": "MADERERA FREYRE", "domicilio": "AV. MALVINAS ARGENTINAS 320", "localidad": "FREYRE", "provincia": "CORDOBA", "telefono": "3564462180", "ruta": "Ruta Provincial 1 (Córdoba)"}, {"nombre": "MUEBLES Y CONFORT FREYRE", "domicilio": "GENERAL PAZ 512", "localidad": "FREYRE", "provincia": "CORDOBA", "telefono": "3564461033", "ruta": "Revisar: Mueblería"}, {"nombre": "LUCAS TORASSA ABERTURAS DE ALUMINIO", "domicilio": "", "localidad": "PORTEÑA", "provincia": "CORDOBA", "telefono": "3564653532", "ruta": "Ruta Provincial 1 (Córdoba)"}, {"nombre": "MADERERA PORTEÑA", "domicilio": "AV. CAMILO BOETTO 450", "localidad": "PORTEÑA", "provincia": "CORDOBA", "telefono": "3564491120", "ruta": "Ruta Provincial 1 (Córdoba)"}, {"nombre": "CARPINTERIA Y MUEBLES PERUSSIA", "domicilio": "INT. PITT FUNES 320", "localidad": "PORTEÑA", "provincia": "CORDOBA", "telefono": "3564491455", "ruta": "Ruta Provincial 1 (Córdoba)"}, {"nombre": "CARPINTERIA LEDESMA", "domicilio": "", "localidad": "BRINKMANN", "provincia": "CORDOBA", "telefono": "3562435329", "ruta": "Ruta Provincial 1 (Córdoba)"}, {"nombre": "CUBRIENDO ESPACIOS AMOBLAMIENTO", "domicilio": "AV. BRINKMANN 232", "localidad": "BRINKMANN", "provincia": "CORDOBA", "telefono": "3564528392", "ruta": "Ruta Provincial 1 (Córdoba)"}, {"nombre": "FORESTAL MAITEN", "domicilio": "JUAN MANUEL DE ROSAS ESQ. SAN LUIS", "localidad": "BRINKMANN", "provincia": "CORDOBA", "telefono": "3562669192", "ruta": "Ruta Provincial 1 (Córdoba)"}, {"nombre": "RINCON DEL NORTE", "domicilio": "HIPOLITO YRIGOYEN 2150", "localidad": "BRINKMANN", "provincia": "CORDOBA", "telefono": "3562400564", "ruta": "Ruta Provincial 1 (Córdoba)"}, {"nombre": "CARPINTERIA CROVELLA", "domicilio": "ITALIA 1150", "localidad": "MORTEROS", "provincia": "CORDOBA", "telefono": "3562405120", "ruta": "Ruta Provincial 1 (Córdoba)"}, {"nombre": "CARPINTERIA DEMARCHI", "domicilio": "BV. 25 DE MAYO 1420", "localidad": "MORTEROS", "provincia": "CORDOBA", "telefono": "3562422315", "ruta": "Ruta Provincial 1 (Córdoba)"}, {"nombre": "AMOBLAMIENTOS MORTEROS", "domicilio": "BV. EL LIBERTADOR 680", "localidad": "MORTEROS", "provincia": "CORDOBA", "telefono": "3562430890", "ruta": "Ruta Provincial 1 (Córdoba)"}, {"nombre": "MADERERA SAN JOSE", "domicilio": "AV. FRONDIZI 850", "localidad": "MORTEROS", "provincia": "CORDOBA", "telefono": "3562402210", "ruta": "Ruta Provincial 1 (Córdoba)"}, {"nombre": "MUEBLES Y CONFORT MORTEROS", "domicilio": "ALBERDI 420", "localidad": "MORTEROS", "provincia": "CORDOBA", "telefono": "3562421840", "ruta": "Revisar: Mueblería"}, {"nombre": "CARPINTERIA Y AMOBLAMIENTOS SERAFIN", "domicilio": "9 DE JULIO 450", "localidad": "SUARDI", "provincia": "SANTA FE", "telefono": "3562477120", "ruta": "Ruta Provincial 23 (Santa Fe)"}, {"nombre": "CARPINTERIA BORGOGNO", "domicilio": "ZEBALLOS 320", "localidad": "SUARDI", "provincia": "SANTA FE", "telefono": "3562478315", "ruta": "Ruta Provincial 23 (Santa Fe)"}, {"nombre": "MADERERA SUARDI", "domicilio": "AV. SANTIAGO DEL ESTERO 680", "localidad": "SUARDI", "provincia": "SANTA FE", "telefono": "3562477540", "ruta": "Ruta Provincial 23 (Santa Fe)"}, {"nombre": "MUEBLES Y CONFORT SUARDI", "domicilio": "RIVADAVIA 210", "localidad": "SUARDI", "provincia": "SANTA FE", "telefono": "3562477205", "ruta": "Revisar: Mueblería"}, {"nombre": "CARPINTERIA MARENGO", "domicilio": "AV. SAN MARTIN 450", "localidad": "SAN GUILLERMO", "provincia": "SANTA FE", "telefono": "3562466120", "ruta": "Ruta Provincial 23 (Santa Fe)"}, {"nombre": "CARPINTERIA Y MUEBLES FONTANINI", "domicilio": "ITALIA 820", "localidad": "SAN GUILLERMO", "provincia": "SANTA FE", "telefono": "3562467315", "ruta": "Ruta Provincial 23 (Santa Fe)"}, {"nombre": "MADERERA SAN GUILLERMO", "domicilio": "RUTA PROVINCIAL 23", "localidad": "SAN GUILLERMO", "provincia": "SANTA FE", "telefono": "3562466540", "ruta": "Ruta Provincial 23 (Santa Fe)"}, {"nombre": "MUEBLES Y CONFORT SAN GUILLERMO", "domicilio": "BELGRANO 310", "localidad": "SAN GUILLERMO", "provincia": "SANTA FE", "telefono": "3562466205", "ruta": "Revisar: Mueblería"}, {"nombre": "CARPINTERIA ROLDAN", "domicilio": "BELGRANO 450", "localidad": "VILLA TRINIDAD", "provincia": "SANTA FE", "telefono": "3491493120", "ruta": "Ruta Provincial 23 (Santa Fe)"}, {"nombre": "CARPINTERIA Y MUEBLES SOLA", "domicilio": "SAN MARTIN 680", "localidad": "VILLA TRINIDAD", "provincia": "SANTA FE", "telefono": "3491493285", "ruta": "Ruta Provincial 23 (Santa Fe)"}, {"nombre": "MADERERA TRINIDAD", "domicilio": "AV. CORDOBA 210", "localidad": "VILLA TRINIDAD", "provincia": "SANTA FE", "telefono": "3491493040", "ruta": "Ruta Provincial 23 (Santa Fe)"}, {"nombre": "MUEBLES Y CONFORT VILLA TRINIDAD", "domicilio": "RIVADAVIA 320", "localidad": "VILLA TRINIDAD", "provincia": "SANTA FE", "telefono": "3491493105", "ruta": "Revisar: Mueblería"}, {"nombre": "CARPINTERIA RIBOTTA", "domicilio": "AV. SAN MARTIN 450", "localidad": "ARRUFO", "provincia": "SANTA FE", "telefono": "3491497120", "ruta": "Ruta Nacional 34"}, {"nombre": "CARPINTERIA Y MUEBLES CRAVERO (ARRUFO)", "domicilio": "RIVADAVIA 280", "localidad": "ARRUFO", "provincia": "SANTA FE", "telefono": "3491497315", "ruta": "Ruta Nacional 34"}, {"nombre": "MADERERA ARRUFO", "domicilio": "RUTA PROVINCIAL 39", "localidad": "ARRUFO", "provincia": "SANTA FE", "telefono": "3491497040", "ruta": "Ruta Nacional 34"}, {"nombre": "MUEBLES Y CONFORT ARRUFO", "domicilio": "BELGRANO 510", "localidad": "ARRUFO", "provincia": "SANTA FE", "telefono": "3491497105", "ruta": "Revisar: Mueblería"}, {"nombre": "CARPINTERIA Y MUEBLES CRAVERO (HERSILIA)", "domicilio": "AV. SAN MARTIN 420", "localidad": "HERSILIA", "provincia": "SANTA FE", "telefono": "3491494120", "ruta": "Ruta Nacional 34"}, {"nombre": "TALLER DE CARPINTERIA GIUSTINA", "domicilio": "BELGRANO 680", "localidad": "HERSILIA", "provincia": "SANTA FE", "telefono": "3491494285", "ruta": "Ruta Nacional 34"}, {"nombre": "MADERERA HERSILIA", "domicilio": "RUTA PROVINCIAL 34 (ACCESO PRINCIPAL)", "localidad": "HERSILIA", "provincia": "SANTA FE", "telefono": "3491494040", "ruta": "Ruta Nacional 34"}, {"nombre": "MUEBLES Y CONFORT HERSILIA", "domicilio": "9 DE JULIO 310", "localidad": "HERSILIA", "provincia": "SANTA FE", "telefono": "3491494105", "ruta": "Revisar: Mueblería"}, {"nombre": "CERMACO SRL MATERIALES PARA LA CONSTRUCCION", "domicilio": "AV. ITALIA 178", "localidad": "CERES", "provincia": "SANTA FE", "telefono": "3491430457", "ruta": "Ruta Nacional 34"}, {"nombre": "MAZA HNOS", "domicilio": "AV. HIPOLITO YRIGOYEN 318", "localidad": "CERES", "provincia": "SANTA FE", "telefono": "3491420043", "ruta": "Ruta Nacional 34"}, {"nombre": "ACEROS BIMOR", "domicilio": "AV. BLAS PARERA 46", "localidad": "CERES", "provincia": "SANTA FE", "telefono": "3491421973", "ruta": "Ruta Nacional 34"}, {"nombre": "ALGARROBOS EL CHAQUE", "domicilio": "HERNANDARIAS 88", "localidad": "CERES", "provincia": "SANTA FE", "telefono": "3491510959", "ruta": "Ruta Nacional 34"}, {"nombre": "CENTRO DEL COLONO", "domicilio": "RUTA 34 KM 390,5", "localidad": "CERES", "provincia": "SANTA FE", "telefono": "3491697175", "ruta": "Ruta Nacional 34"}, {"nombre": "CARPINTERIA CRAVERO (SELVA)", "domicilio": "AV. 9 DE JULIO S/N", "localidad": "SELVA", "provincia": "SANTIAGO DEL ESTERO", "telefono": "3857491120", "ruta": "Ruta Nacional 34"}, {"nombre": "TALLER DE CARPINTERIA Y MUEBLES BARBERO", "domicilio": "RIVADAVIA 450", "localidad": "SELVA", "provincia": "SANTIAGO DEL ESTERO", "telefono": "3857491315", "ruta": "Ruta Nacional 34"}, {"nombre": "MADERERA SELVA", "domicilio": "ACCESO RUTA NACIONAL 34", "localidad": "SELVA", "provincia": "SANTIAGO DEL ESTERO", "telefono": "3857491040", "ruta": "Ruta Nacional 34"}, {"nombre": "MUEBLES Y CONFORT SELVA", "domicilio": "SAN MARTIN 320", "localidad": "SELVA", "provincia": "SANTIAGO DEL ESTERO", "telefono": "3857491205", "ruta": "Revisar: Mueblería"}, {"nombre": "AMOBLAMIENTOS RENO SAN JORGE", "domicilio": "", "localidad": "SAN JORGE", "provincia": "SANTA FE", "telefono": "3406440339", "ruta": "Ruta Provincial 13 (Santa Fe)"}, {"nombre": "AS AMOBLAMIENTOS", "domicilio": "", "localidad": "ARROYITO", "provincia": "CORDOBA", "telefono": "3576651608", "ruta": "Ruta Nacional 19"}, {"nombre": "BOSETTI AMOBLAMIENTOS", "domicilio": "BARTOLOME MITRE 645", "localidad": "ARROYITO", "provincia": "CORDOBA", "telefono": "3576453983", "ruta": "Ruta Nacional 19"}, {"nombre": "ESPACITY", "domicilio": "RAFAEL NUÑEZ", "localidad": "ARROYITO", "provincia": "CORDOBA", "telefono": "3576454009", "ruta": "Ruta Nacional 19"}, {"nombre": "MUEBLERIA PAPA", "domicilio": "25 DE MAYO 1051 LOC 1", "localidad": "ARROYITO", "provincia": "CORDOBA", "telefono": "3576657047", "ruta": "Revisar: Mueblería"}, {"nombre": "MUEBLES MAR-GLA", "domicilio": "25 DE MAYO 801", "localidad": "ARROYITO", "provincia": "CORDOBA", "telefono": "3576421642", "ruta": "Revisar: Mueblería"}, {"nombre": "MODULO MUEBLES A MEDIDA", "domicilio": "RUTA NACIONAL 19 N° 497", "localidad": "RIO PRIMERO", "provincia": "CORDOBA", "telefono": "3574441999", "ruta": "Ruta Nacional 19"}, {"nombre": "CARPINTERIA HERRADOR", "domicilio": "GENERAL PAZ 980", "localidad": "OBISPO TREJO", "provincia": "CORDOBA", "telefono": "3575400238", "ruta": "Ruta Provincial 17"}, {"nombre": "VIRUTA CREACIONES", "domicilio": "ALMTE. BROWN 135", "localidad": "MARULL", "provincia": "CORDOBA", "telefono": "351225 8843", "ruta": "Ruta Provincial 17"}];
+
+
+const uid = (p) => p + "_" + Date.now().toString(36) + Math.random().toString(36).slice(2,8);
+
+function fmtFechaCorta(iso){
+  const d = new Date(iso);
+  const hoy = new Date();
+  const ayer = new Date(); ayer.setDate(hoy.getDate()-1);
+  const mismoDia = (a,b) => a.toDateString() === b.toDateString();
+  if(mismoDia(d, hoy)) return "hoy";
+  if(mismoDia(d, ayer)) return "ayer";
+  return d.toLocaleDateString("es-AR", {day:"2-digit", month:"2-digit", year:"numeric"});
+}
+function fmtFechaCompleta(iso){
+  const d = new Date(iso);
+  return d.toLocaleDateString("es-AR", {day:"2-digit", month:"2-digit", year:"numeric"}) + " " + d.toLocaleTimeString("es-AR", {hour:"2-digit", minute:"2-digit"});
+}
+
+// Esperamos hasta que el script de módulo (arriba en el head) haya terminado
+// de inicializar Firebase y expuesto las funciones en window.
+function esperarFirebase(){
+  return new Promise((resolve)=>{
+    if(window.__firestoreReady) return resolve();
+    const intervalo = setInterval(()=>{
+      if(window.__firestoreReady){
+        clearInterval(intervalo);
+        resolve();
+      }
+    }, 50);
+  });
+}
+
+// El documento único donde guardamos toda la base (simple y suficiente para
+// nuestro volumen de datos). Colección "carpinteros_app", documento "datos".
+async function storageGet(key){
+  try{
+    await esperarFirebase();
+    const ref = window.__firestoreDoc(window.__firestoreDb, "carpinteros_app", key);
+    const snap = await window.__firestoreGetDoc(ref);
+    if(snap.exists()){
+      const datos = snap.data();
+      // Guardamos también una copia local como respaldo offline.
+      try{ window.localStorage.setItem(key, JSON.stringify(datos)); }catch(e){}
+      return datos;
+    }
+    // Si no hay nada en Firestore todavía, probamos con la copia local vieja
+    // (por si el usuario ya tenía datos guardados antes de esta migración).
+    const raw = window.localStorage.getItem(key);
+    return raw ? JSON.parse(raw) : null;
+  }catch(e){
+    console.error("storage get error (usando copia local si existe)", key, e);
+    try{
+      const raw = window.localStorage.getItem(key);
+      return raw ? JSON.parse(raw) : null;
+    }catch(e2){ return null; }
+  }
+}
+
+async function storageSet(key, value){
+  // Guardamos localmente primero, así la app sigue funcionando aunque no haya
+  // internet en ese momento.
+  try{ window.localStorage.setItem(key, JSON.stringify(value)); }catch(e){}
+  try{
+    await esperarFirebase();
+    const ref = window.__firestoreDoc(window.__firestoreDb, "carpinteros_app", key);
+    await window.__firestoreSetDoc(ref, value);
+    return true;
+  }catch(e){
+    console.error("storage set error (Firestore) — quedó guardado solo local por ahora", key, e);
+    return false;
+  }
+}
+
+// Suscribe una función que se ejecuta cada vez que los datos cambian en
+// Firestore (incluyendo cambios hechos desde OTRO dispositivo). Devuelve una
+// función para cancelar la suscripción.
+function suscribirseACambios(key, callback){
+  let cancelado = false;
+  let unsubscribe = null;
+  esperarFirebase().then(()=>{
+    if(cancelado) return;
+    const ref = window.__firestoreDoc(window.__firestoreDb, "carpinteros_app", key);
+    unsubscribe = window.__firestoreOnSnapshot(ref, (snap)=>{
+      if(snap.exists()) callback(snap.data());
+    });
+  });
+  return ()=>{ cancelado = true; if(unsubscribe) unsubscribe(); };
+}
+
+const TIPOS_EVENTO = [
+  {id:"whatsapp", label:"WhatsApp enviado", color:"verde"},
+  {id:"compro", label:"Compró", color:"verde"},
+  {id:"pidio_presupuesto", label:"Pidió presupuesto", color:"azul"},
+];
+
+// Clasificaciones automáticas: el sistema las calcula solo, no se tildan a
+// mano. "Contestó" se infiere de que ya se avanzó a mandar mensajes de la
+// etapa "Segundo contacto" o posterior (eso solo puede pasar si el carpintero
+// respondió algo). "No contestó" es lo contrario: solo hay mensajes de
+// "Primer contacto" y ya pasó el tiempo de espera para esa clasificación.
+const CLASIFICACION_AUTO = {
+  CONTESTO: {id:"contesto_auto", label:"Contestó", color:"azul"},
+  NO_CONTESTO: {id:"no_contesto_auto", label:"No contestó", color:"ambar"},
+};
+
+// Umbral de días sin novedades antes de mostrar la alerta de seguimiento,
+// según la clasificación actual del carpintero (manual o automática).
+const DIAS_ALERTA_POR_CLASIFICACION = {
+  "pidio_presupuesto": 5,
+  "sin_contacto": 5,
+  "contesto_auto": 15,
+  "no_contesto_auto": 15,
+  "compro": 30,
+};
+
+const RUTAS_ACCESO = [
+  "San Francisco",
+  "Ruta Nacional 19",
+  "Ruta Provincial 1 (Córdoba)",
+  "Ruta Provincial 17",
+  "Ruta Provincial 23 (Santa Fe)",
+  "Ruta 158",
+  "Ruta Provincial 13 (Córdoba)",
+  "Ruta Provincial 13 (Santa Fe)",
+  "Ruta Nacional 34",
+  "Ruta Nacional 9",
+  "Ruta Nacional 95",
+  "Sin clasificar",
+  "Ruta Provincial 6",
+  "Ruta Provincial 10",
+  "Revisar: Mueblería",
+];
+
+// Mensajes de primer contacto: se envían como mensajes SEPARADOS (uno por vez,
+// como burbujas de chat independientes), no como un solo texto largo.
+const MENSAJES_PRIMER_CONTACTO = [
+  {tipo:"whatsapp", texto:"Me pasaron el número"},
+  {tipo:"whatsapp", texto:"Me comunico de parte de *SB Herrajes* de Sergio BOSSIO (Ex socio de MyF ACCESORIOS) estamos ubicados en Juan de Garay 2147, San Francisco, Córdoba."},
+  {tipo:"whatsapp", texto:"Nos especializamos en la venta mayorista de herrajes para carpintería de madera y de aluminio, contamos con más de 2000 ítems entre accesorios y herramientas — todo con stock disponible."},
+  {tipo:"whatsapp", texto:"Te puedo pasar una lista de precios actualizada con los productos más usados en la línea carpintería de madera??"},
+];
+
+// Mensajes de segundo contacto: se usan una vez que el carpintero ya respondió
+// al primer contacto. El mensaje del PDF es un recordatorio (no tiene botón de
+// WhatsApp porque wa.me no permite adjuntar archivos automáticamente).
+const MENSAJES_SEGUNDO_CONTACTO = [
+  {tipo:"recordatorio", texto:"Enviá el PDF de la lista de precios (con el 10% de descuento ya aplicado) manualmente desde WhatsApp."},
+  {tipo:"whatsapp", texto:"También disponemos de distintos tipos de accesorios de la marca Bronzen. ¿Querés conocer más de lo que trabajamos?"},
+];
+
+// Mensajes de tercer contacto: se usan cuando el carpintero responde que sí le
+// interesa conocer más sobre los productos Bronzen.
+const MENSAJES_TERCER_CONTACTO = [
+  {tipo:"recordatorio", texto:"Enviá el PDF del catálogo Bronzen manualmente desde WhatsApp."},
+  {tipo:"whatsapp", texto:"Cualquier consulta o pedido quedo a su disposición, o si quiere visitarnos en nuestro salón comercial estamos de lunes a viernes de 8 a 18 hs."},
+  {tipo:"whatsapp", texto:"Saludos"},
+];
+
+// Pedido de datos fiscales para cargar al carpintero como cliente en el sistema.
+const MENSAJES_PEDIDO_DATOS = [
+  {tipo:"whatsapp", texto:"Para poderte cargarte como cliente en el sistema, ¿me podrías pasar estos datos?\n\nNombre y apellido o razón social:\nCondición de IVA: INSCRIPTO / MONOTRIBUTISTA / CONSUMIDOR FINAL\nCUIT:\nDomicilio:\nCódigo Postal:\nLocalidad:\nProvincia:\nE-mail:"},
+];
+
+const DIAS_SEMANA = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes"];
+
+// Arma el texto de "cuándo" para el mensaje de notificación de viaje, según la
+// opción elegida: si es "esta_semana" con días puntuales seleccionados, los
+// lista de forma natural (ej: "el martes y miércoles"); si es "semana_que_viene",
+// queda genérico.
+function armarCuandoViaje(modo, diasElegidos){
+  if(modo === "semana_que_viene") return "la semana que viene";
+  if(!diasElegidos || diasElegidos.length === 0) return "esta semana";
+  const dias = diasElegidos.map(d => d.toLowerCase());
+  if(dias.length === 1) return `el ${dias[0]}`;
+  return `el ${dias.slice(0,-1).join(", ")} y ${dias[dias.length-1]}`;
+}
+
+function mensajeNotificacionViaje(modo, diasElegidos){
+  const cuando = armarCuandoViaje(modo, diasElegidos);
+  return `Te avisamos que ${cuando} estaremos viajando para la zona realizando entregas.\nSi necesitás algún herraje o accesorio, podés enviarnos tu pedido y lo preparamos para entregártelo durante el recorrido.\nQuedamos atentos. ¡Muchas gracias!`;
+}
+
+function saludoSegunHora(){
+  const hora = new Date().getHours();
+  if(hora >= 6 && hora < 12) return "Buenos días";
+  if(hora >= 12 && hora < 19) return "Buenas tardes";
+  return "Buenas noches";
+}
+
+// Determina la "etapa de contacto" de un carpintero según el comentario del
+// evento más reciente (los que se registran automáticamente al enviar mensajes
+// desde Primer contacto empiezan con "Primer/Segundo/Tercer contacto —").
+const ETAPAS_CONTACTO = ["Primer contacto", "Segundo contacto", "Tercer contacto"];
+
+function etapaContactoDe(carpintero){
+  const eventos = carpintero.eventos || [];
+  for(const ev of eventos){ // ya vienen ordenados con el más reciente primero
+    if(!ev.comentario) continue;
+    const encontrada = ETAPAS_CONTACTO.find(e => ev.comentario.startsWith(e));
+    if(encontrada) return encontrada;
+  }
+  return "Sin contacto";
+}
+
+// Determina la clasificación manual más reciente (Compró o Pidió presupuesto)
+// ignorando los eventos automáticos de "WhatsApp enviado". Devuelve null si
+// nunca se tildó ninguna de las dos.
+function clasificacionManualDe(carpintero){
+  const eventos = carpintero.eventos || [];
+  const ev = eventos.find(e => e.tipo !== "whatsapp");
+  return ev ? ev.tipo : null;
+}
+
+// Determina la clasificación combinada: si hay una manual (Compró / Pidió
+// presupuesto), esa tiene prioridad. Si no, se infiere automáticamente según
+// hasta qué etapa de mensajes se avanzó: si ya hay algún mensaje de "Segundo
+// contacto" o posterior, el carpintero contestó (si no, no pudo haber
+// avanzado esa etapa). Si solo hay mensajes de "Primer contacto", todavía no
+// sabemos si contestó o no.
+function clasificacionDe(carpintero){
+  const manual = clasificacionManualDe(carpintero);
+  if(manual) return manual;
+
+  const etapa = etapaContactoDe(carpintero);
+  if(etapa === "Sin contacto") return null;
+  if(etapa === "Primer contacto") return CLASIFICACION_AUTO.NO_CONTESTO.id;
+  return CLASIFICACION_AUTO.CONTESTO.id; // Segundo o Tercer contacto ya alcanzados
+}
+
+// Fecha del evento más reciente relevante para calcular "hace cuánto no hay
+// novedades" (cualquier evento cuenta, no solo los manuales).
+function fechaUltimoMovimiento(carpintero){
+  const eventos = carpintero.eventos || [];
+  if(eventos.length > 0) return eventos[0].fecha;
+  return carpintero.fechaAgregado || null;
+}
+
+// Calcula si corresponde mostrar la alerta de "hace mucho sin novedades" para
+// este carpintero, según su clasificación actual y el umbral de días que le
+// corresponde. Devuelve {alerta:boolean, dias:number|null}.
+function alertaSeguimientoDe(carpintero){
+  const clasificacion = clasificacionDe(carpintero);
+  const clave = clasificacion || "sin_contacto";
+  const umbral = DIAS_ALERTA_POR_CLASIFICACION[clave];
+  if(umbral === undefined) return {alerta:false, dias:null}; // "Compró" con id distinto, etc.
+
+  const fecha = fechaUltimoMovimiento(carpintero);
+  if(!fecha) return {alerta:false, dias:null};
+
+  const dias = Math.floor((Date.now() - new Date(fecha).getTime()) / (1000*60*60*24));
+  return {alerta: dias >= umbral, dias};
+}
+
+function labelEvento(tipoId){
+  const t = TIPOS_EVENTO.find(x=>x.id===tipoId)
+    || Object.values(CLASIFICACION_AUTO).find(x=>x.id===tipoId);
+  return t ? t.label : tipoId;
+}
+
+function colorEvento(tipoId){
+  const t = TIPOS_EVENTO.find(x=>x.id===tipoId)
+    || Object.values(CLASIFICACION_AUTO).find(x=>x.id===tipoId);
+  const color = t ? t.color : "gris";
+  const mapa = {
+    azul: {bg:"var(--azul-100)", fg:"var(--azul-700)"},
+    verde: {bg:"var(--verde-100)", fg:"var(--verde-600)"},
+    ambar: {bg:"var(--ambar-100)", fg:"var(--ambar-600)"},
+    rojo: {bg:"var(--rojo-100)", fg:"var(--rojo-600)"},
+    gris: {bg:"var(--gris-100)", fg:"var(--gris-500)"},
+  };
+  return mapa[color];
+}
+
+// Convierte un texto de teléfono viejo (posiblemente con varios números pegados
+// por guiones o espacios, en formato área-número repetido) en una lista de
+// teléfonos [{id, nombre, numero}]. Reconstruye "código de área + número local"
+// cuando detecta un grupo corto (el área) seguido de uno o más números cortos
+// que la comparten.
+function separarTelefonos(texto){
+  if(!texto || !texto.trim()) return [];
+  const grupos = texto.match(/\d+/g) || [];
+  if(grupos.length === 0) return [];
+
+  const numeros = [];
+  let i = 0;
+  while(i < grupos.length){
+    const g = grupos[i];
+    if(g.length >= 10){
+      numeros.push(g);
+      i++;
+    } else if(g.length <= 4 && i+1 < grupos.length){
+      const area = g;
+      i++;
+      let sumoAlguno = false;
+      while(i < grupos.length && grupos[i].length >= 5 && grupos[i].length <= 7){
+        numeros.push(area + grupos[i]);
+        i++;
+        sumoAlguno = true;
+      }
+      if(!sumoAlguno) numeros.push(area); // caso raro: área suelta sin número asociado
+    } else {
+      if(g.length >= 4) numeros.push(g);
+      i++;
+    }
+  }
+  const unicos = [...new Set(numeros)];
+  return unicos.map(n => ({ id: uid("tel"), nombre:"", numero:n }));
+}
+
+function seedInicial(){
+  const ahora = new Date().toISOString();
+  const carpinteros = SEED_CARPINTEROS.map(c => {
+    const { telefono, ...resto } = c;
+    return {...resto, id: uid("carp"), eventos: [], telefonos: separarTelefonos(telefono), fechaAgregado: ahora};
+  });
+  return { carpinteros };
+}
+
+function App(){
+  const [cargando, setCargando] = useState(true);
+  const [db, setDb] = useState(null);
+  const [modalAbierto, setModalAbierto] = useState(false);
+  const [editando, setEditando] = useState(null);
+  const [carpinteroEventos, setCarpinteroEventos] = useState(null);
+  const [busqueda, setBusqueda] = useState("");
+  const [filtroLocalidad, setFiltroLocalidad] = useState("todas");
+  const [filtroRuta, setFiltroRuta] = useState("todas");
+  const [filtroEtapaContacto, setFiltroEtapaContacto] = useState("todas");
+  const [filtroClasificacion, setFiltroClasificacion] = useState("todas");
+  const [orden, setOrden] = useState("nombre");
+  const [toast, setToast] = useState(null);
+  const [modoSeleccion, setModoSeleccion] = useState(false);
+  const [seleccionados, setSeleccionados] = useState(()=> new Set());
+  const [modalEventoMasivo, setModalEventoMasivo] = useState(false);
+  const [envioMasivoAbierto, setEnvioMasivoAbierto] = useState(false);
+  const [carpinteroPrimerContacto, setCarpinteroPrimerContacto] = useState(null);
+  const [carpinteroDetalle, setCarpinteroDetalle] = useState(null);
+  const COLUMNAS_OCULTABLES = ["ruta", "clasificacion", "etapa", "ultimoEvento", "alertas"];
+  const [columnasOcultas, setColumnasOcultas] = useState(()=> new Set());
+
+  const mostrarToast = useCallback((msg)=>{ setToast({msg, id:Date.now()}); }, []);
+
+  useEffect(()=>{
+    let t;
+    if(toast){ t = setTimeout(()=>setToast(null), 2400); }
+    return ()=>clearTimeout(t);
+  }, [toast]);
+
+  useEffect(()=>{
+    (async ()=>{
+      setCargando(true);
+      let data = await storageGet("carpinteros_v1");
+      if(!data){
+        data = seedInicial();
+        await storageSet("carpinteros_v1", data);
+      } else {
+        let huboMigracion = false;
+
+        // Migración 1: si hay carpinteros guardados con el campo viejo "telefono"
+        // (texto simple) y sin "telefonos" (lista nueva), los convertimos acá
+        // para no perder los datos ya cargados.
+        let carpinterosMigrados = data.carpinteros.map(c=>{
+          if(c.telefonos) return c; // ya está en formato nuevo, no tocar
+          huboMigracion = true;
+          const { telefono, ...resto } = c;
+          return {...resto, telefonos: separarTelefonos(telefono)};
+        });
+
+        // Migración 2: los carpinteros de SAN FRANCISCO que quedaron con la
+        // clasificación vieja "Ruta Nacional 19" pasan a su propia zona
+        // "San Francisco", sin tocar el resto de sus datos ni sus eventos.
+        carpinterosMigrados = carpinterosMigrados.map(c=>{
+          const localidad = (c.localidad||"").toUpperCase();
+          if(localidad.includes("SAN FRANCISCO") && c.ruta === "Ruta Nacional 19"){
+            huboMigracion = true;
+            return {...c, ruta: "San Francisco"};
+          }
+          return c;
+        });
+
+        // Migración 5: limpiamos el código postal que algunas localidades
+        // guardadas todavía tienen al inicio (ej: "2434 ARROYITO" -> "ARROYITO"),
+        // y unificamos mayúsculas/minúsculas, para que el filtro de localidad
+        // no muestre la misma localidad repetida con formatos distintos.
+        carpinterosMigrados = carpinterosMigrados.map(c=>{
+          const localidadOriginal = c.localidad || "";
+          const localidadLimpia = localidadOriginal.replace(/^\d+\s+/, "").trim().toUpperCase();
+          if(localidadLimpia !== localidadOriginal){
+            huboMigracion = true;
+            return {...c, localidad: localidadLimpia};
+          }
+          return c;
+        });
+
+        // Migración 6: los carpinteros que ya existían antes de este cambio no
+        // tienen "fechaAgregado" (la usamos para calcular la alerta de "Sin
+        // contacto" hace X días). Les asignamos la fecha de este momento, ya
+        // que no tenemos el dato real de cuándo se cargaron originalmente.
+        const ahoraMigracion6 = new Date().toISOString();
+        carpinterosMigrados = carpinterosMigrados.map(c=>{
+          if(c.fechaAgregado) return c;
+          huboMigracion = true;
+          return {...c, fechaAgregado: ahoraMigracion6};
+        });
+
+        // Migración 3: sumamos los carpinteros nuevos que están en SEED_CARPINTEROS
+        // pero todavía no existen en los datos guardados (comparando por nombre,
+        // que es la clave estable entre el seed y lo que ya tenés cargado).
+        // No toca ni reemplaza a los que ya existen.
+        const nombresExistentes = new Set(carpinterosMigrados.map(c => (c.nombre||"").trim().toUpperCase()));
+        const faltantes = SEED_CARPINTEROS.filter(c => !nombresExistentes.has((c.nombre||"").trim().toUpperCase()));
+        if(faltantes.length > 0){
+          huboMigracion = true;
+          const nuevosCarpinteros = faltantes.map(c => {
+            const { telefono, ...resto } = c;
+            return {...resto, id: uid("carp"), eventos: [], telefonos: separarTelefonos(telefono), fechaAgregado: ahoraMigracion6};
+          });
+          carpinterosMigrados = [...carpinterosMigrados, ...nuevosCarpinteros];
+        }
+
+        if(huboMigracion){
+          data = {...data, carpinteros: carpinterosMigrados};
+          await storageSet("carpinteros_v1", data);
+        }
+      }
+      setDb(data);
+      setCargando(false);
+    })();
+  }, []);
+
+  // Suscripción en tiempo real: si los datos cambian en Firestore desde OTRO
+  // dispositivo (ej: la compu), este celu se actualiza solo, sin recargar.
+  useEffect(()=>{
+    const cancelar = suscribirseACambios("carpinteros_v1", (datosNuevos)=>{
+      setDb(prev=>{
+        // Evitamos un re-render/parpadeo innecesario si son exactamente los
+        // mismos datos que ya tenemos (por ejemplo, el eco de nuestra propia
+        // escritura reciente).
+        if(prev && JSON.stringify(prev) === JSON.stringify(datosNuevos)) return prev;
+        return datosNuevos;
+      });
+    });
+    return cancelar;
+  }, []);
+
+  const guardarDb = useCallback(async (nuevaDb) => {
+    setDb(nuevaDb);
+    await storageSet("carpinteros_v1", nuevaDb);
+  }, []);
+
+  function exportarBackup(){
+    const fecha = new Date().toISOString().slice(0,10);
+    const blob = new Blob([JSON.stringify(db, null, 2)], {type:"application/json"});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `carpinteros_backup_${fecha}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    mostrarToast("Backup descargado");
+  }
+
+  function importarBackup(archivo){
+    const lector = new FileReader();
+    lector.onload = async (e) => {
+      try {
+        const datos = JSON.parse(e.target.result);
+        if(!datos || !Array.isArray(datos.carpinteros)){
+          alert("El archivo no tiene el formato esperado (carpinteros_backup_....json).");
+          return;
+        }
+        const cantidad = datos.carpinteros.length;
+        if(!confirm(`Este backup tiene ${cantidad} carpinteros. Esto va a REEMPLAZAR todos los datos actuales de este dispositivo. ¿Continuar?`)) return;
+        await guardarDb(datos);
+        mostrarToast(`Backup restaurado: ${cantidad} carpinteros`);
+      } catch(err){
+        alert("No se pudo leer el archivo. Verificá que sea un backup válido exportado desde esta misma app.");
+      }
+    };
+    lector.readAsText(archivo);
+  }
+
+  async function guardarCarpintero(carp){
+    const existe = db.carpinteros.some(c=>c.id===carp.id);
+    const nuevos = existe ? db.carpinteros.map(c=> c.id===carp.id ? carp : c) : [...db.carpinteros, {...carp, eventos:[], fechaAgregado: new Date().toISOString()}];
+    await guardarDb({...db, carpinteros: nuevos});
+    mostrarToast("Carpintero guardado");
+    setModalAbierto(false);
+    setEditando(null);
+  }
+
+  async function actualizarCampoCarpintero(id, campo, valor){
+    const nuevos = db.carpinteros.map(c=> c.id===id ? {...c, [campo]: valor} : c);
+    await guardarDb({...db, carpinteros: nuevos});
+  }
+
+  async function marcarSinWhatsapp(carpinteroId, telefonoId, valor){
+    const nuevos = db.carpinteros.map(c=>{
+      if(c.id!==carpinteroId) return c;
+      const telefonos = (c.telefonos||[]).map(t=> t.id===telefonoId ? {...t, sinWhatsapp: valor} : t);
+      return {...c, telefonos};
+    });
+    await guardarDb({...db, carpinteros: nuevos});
+  }
+
+  async function eliminarCarpintero(id){
+    if(!confirm("¿Eliminar este carpintero?")) return;
+    await guardarDb({...db, carpinteros: db.carpinteros.filter(c=>c.id!==id)});
+    mostrarToast("Carpintero eliminado");
+  }
+
+  async function agregarEvento(carpinteroId, evento){
+    const nuevos = db.carpinteros.map(c=>{
+      if(c.id!==carpinteroId) return c;
+      const eventos = c.eventos || [];
+      return {...c, eventos: [evento, ...eventos]};
+    });
+    await guardarDb({...db, carpinteros: nuevos});
+    mostrarToast("Evento registrado");
+  }
+
+  async function eliminarEvento(carpinteroId, eventoId){
+    if(!confirm("¿Eliminar este evento del historial?")) return;
+    const nuevos = db.carpinteros.map(c=>{
+      if(c.id!==carpinteroId) return c;
+      return {...c, eventos: (c.eventos||[]).filter(e=>e.id!==eventoId)};
+    });
+    await guardarDb({...db, carpinteros: nuevos});
+    mostrarToast("Evento eliminado");
+  }
+
+  async function agregarEventoMasivo(eventoBase){
+    const idsSeleccionados = seleccionados;
+    const nuevos = db.carpinteros.map(c=>{
+      if(!idsSeleccionados.has(c.id)) return c;
+      const eventos = c.eventos || [];
+      const evento = {...eventoBase, id: uid("ev")};
+      return {...c, eventos: [evento, ...eventos]};
+    });
+    await guardarDb({...db, carpinteros: nuevos});
+    mostrarToast(`Evento registrado en ${idsSeleccionados.size} carpinteros`);
+    setSeleccionados(new Set());
+    setModoSeleccion(false);
+    setModalEventoMasivo(false);
+  }
+
+  function alternarSeleccion(id){
+    setSeleccionados(prev=>{
+      const next = new Set(prev);
+      if(next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+
+  function seleccionarTodosFiltrados(){
+    setSeleccionados(new Set(carpinterosFiltrados.map(c=>c.id)));
+  }
+
+  function limpiarSeleccion(){
+    setSeleccionados(new Set());
+  }
+
+  const localidades = useMemo(()=>{
+    if(!db) return [];
+    const base = filtroRuta==="todas"
+      ? db.carpinteros
+      : db.carpinteros.filter(c=> (c.ruta||"Sin especificar")===filtroRuta);
+    return ["todas", ...new Set(base.map(c=>c.localidad).filter(Boolean))].sort();
+  }, [db, filtroRuta]);
+
+  useEffect(()=>{
+    if(filtroLocalidad!=="todas" && !localidades.includes(filtroLocalidad)){
+      setFiltroLocalidad("todas");
+    }
+  }, [localidades, filtroLocalidad]);
+
+  const comentariosUnicos = useMemo(()=>{
+    if(!db) return [];
+    const set = new Set();
+    db.carpinteros.forEach(c=>{
+      (c.eventos||[]).forEach(ev=>{
+        if(ev.comentario && ev.comentario.trim()) set.add(ev.comentario.trim());
+      });
+    });
+    return [...set].sort((a,b)=> a.localeCompare(b, 'es'));
+  }, [db]);
+
+  const carpinterosFiltrados = useMemo(()=>{
+    if(!db) return [];
+    let lista = db.carpinteros.filter(c=>{
+      if(filtroLocalidad!=="todas" && c.localidad!==filtroLocalidad) return false;
+      if(filtroRuta!=="todas" && (c.ruta||"Sin especificar")!==filtroRuta) return false;
+      if(filtroEtapaContacto!=="todas" && etapaContactoDe(c)!==filtroEtapaContacto) return false;
+      if(filtroClasificacion!=="todas" && clasificacionDe(c)!==filtroClasificacion) return false;
+      if(busqueda){
+        const q = busqueda.toLowerCase();
+        const telefonosTexto = (c.telefonos||[]).map(t=>t.numero+" "+(t.nombre||"")).join(" ").toLowerCase();
+        return c.nombre.toLowerCase().includes(q) || (c.localidad||"").toLowerCase().includes(q) || telefonosTexto.includes(q);
+      }
+      return true;
+    });
+    if(orden==="nombre") lista = [...lista].sort((a,b)=> a.nombre.localeCompare(b.nombre));
+    if(orden==="localidad") lista = [...lista].sort((a,b)=> (a.localidad||"").localeCompare(b.localidad||""));
+    if(orden==="ruta") lista = [...lista].sort((a,b)=> (a.ruta||"Sin especificar").localeCompare(b.ruta||"Sin especificar"));
+    if(orden==="ultimo_contacto") lista = [...lista].sort((a,b)=>{
+      const fa = (a.eventos||[])[0]?.fecha || "0";
+      const fb = (b.eventos||[])[0]?.fecha || "0";
+      return fb.localeCompare(fa);
+    });
+    return lista;
+  }, [db, busqueda, filtroLocalidad, filtroRuta, filtroEtapaContacto, filtroClasificacion, orden]);
+
+  if(cargando || !db){
+    return (
+      <div style={{display:"flex", alignItems:"center", justifyContent:"center", height:"100vh", flexDirection:"column", gap:12}}>
+        <div style={{width:36, height:36, border:"3px solid var(--azul-100)", borderTopColor:"var(--azul-600)", borderRadius:"50%", animation:"spin 0.8s linear infinite"}}></div>
+        <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+        <div style={{color:"var(--gris-500)", fontSize:14}}>Cargando...</div>
+      </div>
+    );
+  }
+
+  const totalCarpinteros = db.carpinteros.length;
+  const contactados = db.carpinteros.filter(c=>(c.eventos||[]).length>0).length;
+
+  return (
+    <div style={{minHeight:"100vh", background:"var(--gris-50)"}}>
+      <header style={{background:"var(--azul-900)", color:"#fff", padding:"18px 20px"}}>
+        <div style={{fontWeight:800, fontSize:19}}>Carpinteros <span style={{color:"#7fb4ea"}}>Clientes</span></div>
+        <div style={{fontSize:12.5, color:"rgba(255,255,255,0.65)", marginTop:2}}>
+          {totalCarpinteros} carpinteros · {contactados} con seguimiento cargado
+        </div>
+      </header>
+
+      <main style={{padding:"18px 16px", maxWidth:720, margin:"0 auto"}}>
+        <div style={{display:"flex", gap:8, marginBottom:14, flexWrap:"wrap"}}>
+          <input placeholder="Buscar nombre, localidad o teléfono..." value={busqueda} onChange={e=>setBusqueda(e.target.value)}
+            style={{flex:"1 1 180px", padding:"10px 12px", borderRadius:8, border:"1px solid var(--gris-300)", fontSize:14}} />
+          <button onClick={()=>{setEditando(null); setModalAbierto(true);}}
+            style={{padding:"10px 16px", borderRadius:8, border:"none", background:"var(--azul-600)", color:"#fff", fontSize:14, fontWeight:600, whiteSpace:"nowrap"}}>
+            + Carpintero
+          </button>
+          <button onClick={()=>{ if(modoSeleccion){ limpiarSeleccion(); } setModoSeleccion(m=>!m); }}
+            style={{padding:"10px 16px", borderRadius:8, border: modoSeleccion ? "none" : "1px solid var(--azul-500)",
+              background: modoSeleccion ? "var(--rojo-600)" : "#fff", color: modoSeleccion ? "#fff" : "var(--azul-600)",
+              fontSize:14, fontWeight:600, whiteSpace:"nowrap"}}>
+            {modoSeleccion ? "✕ Cancelar selección" : "☑ Selección masiva"}
+          </button>
+        </div>
+
+        <div style={{display:"flex", gap:8, marginBottom:14, flexWrap:"wrap"}}>
+          <button onClick={exportarBackup}
+            style={{padding:"8px 14px", borderRadius:8, border:"1px solid var(--gris-300)", background:"#fff", color:"var(--gris-700)", fontSize:12.5, fontWeight:600, whiteSpace:"nowrap"}}>
+            ⬇️ Exportar backup
+          </button>
+          <label style={{padding:"8px 14px", borderRadius:8, border:"1px solid var(--gris-300)", background:"#fff", color:"var(--gris-700)", fontSize:12.5, fontWeight:600, whiteSpace:"nowrap", cursor:"pointer", display:"inline-block"}}>
+            ⬆️ Importar backup
+            <input type="file" accept="application/json" style={{display:"none"}}
+              onChange={e=>{ if(e.target.files[0]) importarBackup(e.target.files[0]); e.target.value=""; }} />
+          </label>
+        </div>
+
+        <div style={{display:"flex", gap:8, marginBottom:16, flexWrap:"wrap"}}>
+          <select value={filtroRuta} onChange={e=>setFiltroRuta(e.target.value)} style={{flex:"1 1 140px", padding:"8px 10px", borderRadius:8, border:"1px solid var(--gris-300)", fontSize:13}}>
+            <option value="todas">Todas las rutas</option>
+            {RUTAS_ACCESO.map(r=> <option key={r} value={r}>{r}</option>)}
+            <option value="Sin especificar">Sin especificar</option>
+          </select>
+          <select value={filtroLocalidad} onChange={e=>setFiltroLocalidad(e.target.value)} style={{flex:"1 1 140px", padding:"8px 10px", borderRadius:8, border:"1px solid var(--gris-300)", fontSize:13}}>
+            {localidades.map(l=> <option key={l} value={l}>{l==="todas" ? "Todas las localidades" : l}</option>)}
+          </select>
+          <select value={filtroEtapaContacto} onChange={e=>setFiltroEtapaContacto(e.target.value)} style={{flex:"1 1 140px", padding:"8px 10px", borderRadius:8, border:"1px solid var(--gris-300)", fontSize:13}}>
+            <option value="todas">Todos los contactos</option>
+            <option value="Sin contacto">Sin contacto</option>
+            <option value="Primer contacto">Primer contacto</option>
+            <option value="Segundo contacto">Segundo contacto</option>
+            <option value="Tercer contacto">Tercer contacto</option>
+          </select>
+          <select value={filtroClasificacion} onChange={e=>setFiltroClasificacion(e.target.value)} style={{flex:"1 1 140px", padding:"8px 10px", borderRadius:8, border:"1px solid var(--gris-300)", fontSize:13}}>
+            <option value="todas">Todas las clasificaciones</option>
+            {TIPOS_EVENTO.filter(t=>t.id!=="whatsapp").map(t=> <option key={t.id} value={t.id}>{t.label}</option>)}
+            {Object.values(CLASIFICACION_AUTO).map(t=> <option key={t.id} value={t.id}>{t.label} (auto)</option>)}
+          </select>
+          <select value={orden} onChange={e=>setOrden(e.target.value)} style={{flex:"1 1 140px", padding:"8px 10px", borderRadius:8, border:"1px solid var(--gris-300)", fontSize:13}}>
+            <option value="nombre">Nombre (A-Z)</option>
+            <option value="localidad">Localidad (A-Z)</option>
+            <option value="ruta">Ruta de acceso</option>
+            <option value="ultimo_contacto">Último contacto</option>
+          </select>
+        </div>
+
+        {modoSeleccion && (
+          <div style={{display:"flex", gap:10, alignItems:"center", marginBottom:14, fontSize:13}}>
+            <span style={{color:"var(--gris-700)", fontWeight:600}}>{seleccionados.size} seleccionados</span>
+            <button onClick={seleccionarTodosFiltrados} style={{background:"none", border:"none", color:"var(--azul-600)", fontWeight:600, padding:0}}>
+              Seleccionar los {carpinterosFiltrados.length} filtrados
+            </button>
+            <button onClick={limpiarSeleccion} style={{background:"none", border:"none", color:"var(--gris-500)", padding:0}}>
+              Ninguno
+            </button>
+          </div>
+        )}
+
+        {carpinterosFiltrados.length===0 ? (
+          <div style={{textAlign:"center", padding:"40px 20px", color:"var(--gris-500)", fontSize:14}}>
+            {db.carpinteros.length===0 ? "Todavía no cargaste ningún carpintero." : "No hay carpinteros que coincidan con el filtro."}
+          </div>
+        ) : (
+          <div style={{overflowX:"auto", border:"1px solid var(--gris-100)", borderRadius:12, background:"#fff"}}>
+            <table style={{width:"100%", borderCollapse:"collapse", fontSize:13}}>
+              <thead>
+                <tr style={{background:"var(--gris-50)", borderBottom:"1px solid var(--gris-100)"}}>
+                  {modoSeleccion && <th style={{padding:"8px 6px", width:30}}></th>}
+                  <th style={{padding:"8px 10px", textAlign:"left", fontWeight:700, whiteSpace:"nowrap"}}>Nombre</th>
+                  <th style={{padding:"8px 10px", textAlign:"left", fontWeight:700, whiteSpace:"nowrap"}}>Localidad</th>
+                  <th style={{padding:"8px 10px", textAlign:"left", fontWeight:700, whiteSpace:"nowrap"}}>Teléfono</th>
+                  {!columnasOcultas.has("ruta") && (
+                    <th style={{padding:"8px 10px", textAlign:"left", fontWeight:700, whiteSpace:"nowrap"}}>
+                      Ruta <button onClick={()=>setColumnasOcultas(prev=>new Set(prev).add("ruta"))} style={{background:"none", border:"none", color:"var(--gris-500)", fontWeight:700, padding:"0 2px", cursor:"pointer"}}>✕</button>
+                    </th>
+                  )}
+                  {!columnasOcultas.has("clasificacion") && (
+                    <th style={{padding:"8px 10px", textAlign:"left", fontWeight:700, whiteSpace:"nowrap"}}>
+                      Clasificación <button onClick={()=>setColumnasOcultas(prev=>new Set(prev).add("clasificacion"))} style={{background:"none", border:"none", color:"var(--gris-500)", fontWeight:700, padding:"0 2px", cursor:"pointer"}}>✕</button>
+                    </th>
+                  )}
+                  {!columnasOcultas.has("etapa") && (
+                    <th style={{padding:"8px 10px", textAlign:"left", fontWeight:700, whiteSpace:"nowrap"}}>
+                      Etapa <button onClick={()=>setColumnasOcultas(prev=>new Set(prev).add("etapa"))} style={{background:"none", border:"none", color:"var(--gris-500)", fontWeight:700, padding:"0 2px", cursor:"pointer"}}>✕</button>
+                    </th>
+                  )}
+                  {!columnasOcultas.has("ultimoEvento") && (
+                    <th style={{padding:"8px 10px", textAlign:"left", fontWeight:700, whiteSpace:"nowrap"}}>
+                      Último evento <button onClick={()=>setColumnasOcultas(prev=>new Set(prev).add("ultimoEvento"))} style={{background:"none", border:"none", color:"var(--gris-500)", fontWeight:700, padding:"0 2px", cursor:"pointer"}}>✕</button>
+                    </th>
+                  )}
+                  {!columnasOcultas.has("alertas") && (
+                    <th style={{padding:"8px 10px", textAlign:"left", fontWeight:700, whiteSpace:"nowrap"}}>
+                      Alertas <button onClick={()=>setColumnasOcultas(prev=>new Set(prev).add("alertas"))} style={{background:"none", border:"none", color:"var(--gris-500)", fontWeight:700, padding:"0 2px", cursor:"pointer"}}>✕</button>
+                    </th>
+                  )}
+                </tr>
+              </thead>
+              <tbody>
+                {carpinterosFiltrados.map(c=>{
+                  const clasificacionManual = (c.eventos||[]).find(e=>e.tipo!=="whatsapp");
+                  const clasificacionAutoId = !clasificacionManual ? clasificacionDe(c) : null;
+                  const clasificacionAuto = clasificacionAutoId ? Object.values(CLASIFICACION_AUTO).find(x=>x.id===clasificacionAutoId) : null;
+                  const etiquetaClasificacion = clasificacionManual ? labelEvento(clasificacionManual.tipo) : (clasificacionAuto ? clasificacionAuto.label+" (auto)" : "—");
+                  const colorClasificacion = clasificacionManual ? colorEvento(clasificacionManual.tipo) : (clasificacionAuto ? colorEvento(clasificacionAuto.id) : null);
+                  const etapa = etapaContactoDe(c);
+                  const ultimoEvento = (c.eventos||[])[0];
+                  const {alerta, dias} = alertaSeguimientoDe(c);
+                  const primerTel = (c.telefonos||[])[0];
+                  return (
+                    <tr key={c.id} onClick={()=>setCarpinteroDetalle(c)}
+                      style={{borderBottom:"1px solid var(--gris-100)", cursor:"pointer",
+                        background: modoSeleccion && seleccionados.has(c.id) ? "var(--azul-50)" : "transparent"}}>
+                      {modoSeleccion && (
+                        <td style={{padding:"8px 6px"}} onClick={e=>e.stopPropagation()}>
+                          <input type="checkbox" checked={seleccionados.has(c.id)} onChange={()=>alternarSeleccion(c.id)} style={{width:18, height:18}} />
+                        </td>
+                      )}
+                      <td style={{padding:"8px 10px", fontWeight:600, whiteSpace:"nowrap"}}>{c.nombre}</td>
+                      <td style={{padding:"8px 10px", color:"var(--gris-600)", whiteSpace:"nowrap"}}>{c.localidad || "—"}</td>
+                      <td style={{padding:"8px 10px", whiteSpace:"nowrap"}}>
+                        {primerTel ? (primerTel.sinWhatsapp ? `📵 ${primerTel.numero}` : primerTel.numero) : "—"}
+                      </td>
+                      {!columnasOcultas.has("ruta") && <td style={{padding:"8px 10px", color:"var(--gris-600)", whiteSpace:"nowrap"}}>{c.ruta || "—"}</td>}
+                      {!columnasOcultas.has("clasificacion") && (
+                        <td style={{padding:"8px 10px", whiteSpace:"nowrap"}}>
+                          {colorClasificacion ? (
+                            <span style={{fontSize:10.5, padding:"2px 8px", borderRadius:20, fontWeight:700, background:colorClasificacion.bg, color:colorClasificacion.fg}}>
+                              {etiquetaClasificacion}
+                            </span>
+                          ) : "—"}
+                        </td>
+                      )}
+                      {!columnasOcultas.has("etapa") && <td style={{padding:"8px 10px", color:"var(--gris-600)", whiteSpace:"nowrap"}}>{etapa}</td>}
+                      {!columnasOcultas.has("ultimoEvento") && (
+                        <td style={{padding:"8px 10px", color:"var(--gris-600)", whiteSpace:"nowrap"}}>
+                          {ultimoEvento ? fmtFechaCorta(ultimoEvento.fecha) : "—"}
+                        </td>
+                      )}
+                      {!columnasOcultas.has("alertas") && (
+                        <td style={{padding:"8px 10px", whiteSpace:"nowrap"}}>
+                          {alerta ? <span style={{color:"var(--rojo-600)", fontWeight:700, fontSize:12}}>⏰ {dias}d</span> : "—"}
+                        </td>
+                      )}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+            {columnasOcultas.size > 0 && (
+              <div style={{padding:"10px", borderTop:"1px solid var(--gris-100)"}}>
+                <button onClick={()=>setColumnasOcultas(new Set())}
+                  style={{fontSize:12.5, color:"var(--azul-600)", background:"none", border:"1px dashed var(--azul-500)", borderRadius:7, padding:"6px 12px"}}>
+                  + Agregar columna ({columnasOcultas.size} oculta{columnasOcultas.size>1?"s":""})
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+      </main>
+
+      {modoSeleccion && seleccionados.size>0 && (
+        <div style={{position:"fixed", bottom:0, left:0, right:0, background:"var(--azul-900)", padding:"12px 16px", display:"flex", alignItems:"center", justifyContent:"space-between", gap:8, zIndex:60, boxShadow:"0 -4px 16px rgba(0,0,0,0.15)", flexWrap:"wrap"}}>
+          <span style={{color:"#fff", fontSize:14, fontWeight:600}}>{seleccionados.size} seleccionados</span>
+          <div style={{display:"flex", gap:8}}>
+            <button onClick={()=>setEnvioMasivoAbierto(true)}
+              style={{padding:"10px 14px", borderRadius:8, border:"none", background:"var(--verde-600)", color:"#fff", fontWeight:700, fontSize:13.5, whiteSpace:"nowrap"}}>
+              📨 Enviar mensajes
+            </button>
+            <button onClick={()=>setModalEventoMasivo(true)}
+              style={{padding:"10px 14px", borderRadius:8, border:"none", background:"var(--azul-600)", color:"#fff", fontWeight:700, fontSize:13.5, whiteSpace:"nowrap"}}>
+              Aplicar evento
+            </button>
+          </div>
+        </div>
+      )}
+
+      {modalAbierto && (
+        <ModalCarpintero carpintero={editando} onGuardar={guardarCarpintero} onCerrar={()=>{setModalAbierto(false); setEditando(null);}} />
+      )}
+
+      {carpinteroEventos && (
+        <ModalEventos
+          carpintero={db.carpinteros.find(c=>c.id===carpinteroEventos.id) || carpinteroEventos}
+          onAgregar={(ev)=>agregarEvento(carpinteroEventos.id, ev)}
+          onEliminar={(evId)=>eliminarEvento(carpinteroEventos.id, evId)}
+          onCerrar={()=>setCarpinteroEventos(null)}
+          comentariosPrevios={comentariosUnicos}
+        />
+      )}
+
+      {modalEventoMasivo && (
+        <ModalEventoMasivo
+          cantidad={seleccionados.size}
+          onAplicar={agregarEventoMasivo}
+          onCerrar={()=>setModalEventoMasivo(false)}
+          comentariosPrevios={comentariosUnicos}
+        />
+      )}
+
+      {envioMasivoAbierto && (
+        <ModalEnvioMasivo
+          carpinteros={db.carpinteros.filter(c=>seleccionados.has(c.id))}
+          onRegistrarEnvio={agregarEvento}
+          onCerrar={()=>setEnvioMasivoAbierto(false)}
+        />
+      )}
+
+      {carpinteroPrimerContacto && (
+        <ModalPrimerContacto
+          carpintero={db.carpinteros.find(c=>c.id===carpinteroPrimerContacto.id) || carpinteroPrimerContacto}
+          onCerrar={()=>setCarpinteroPrimerContacto(null)}
+          onRegistrarEnvio={(evento)=>agregarEvento(carpinteroPrimerContacto.id, evento)}
+          onMarcarDatosCompletos={(valor)=>actualizarCampoCarpintero(carpinteroPrimerContacto.id, "datosCompletos", valor)}
+        />
+      )}
+
+      {carpinteroDetalle && (
+        <ModalDetalleCarpintero
+          carpintero={db.carpinteros.find(c=>c.id===carpinteroDetalle.id) || carpinteroDetalle}
+          onCerrar={()=>setCarpinteroDetalle(null)}
+          onAgregarEvento={agregarEvento}
+          onMarcarSinWhatsapp={marcarSinWhatsapp}
+          onAbrirPrimerContacto={(c)=>{setCarpinteroDetalle(null); setCarpinteroPrimerContacto(c);}}
+          onAbrirSeguimiento={(c)=>{setCarpinteroDetalle(null); setCarpinteroEventos(c);}}
+          onEditar={(c)=>{setCarpinteroDetalle(null); setEditando(c); setModalAbierto(true);}}
+          onEliminar={(id)=>{setCarpinteroDetalle(null); eliminarCarpintero(id);}}
+        />
+      )}
+
+      {toast && (
+        <div style={{position:"fixed", bottom:24, left:"50%", transform:"translateX(-50%)", background:"var(--verde-600)", color:"#fff", padding:"11px 20px", borderRadius:10, boxShadow:"0 8px 24px rgba(0,0,0,0.2)", fontSize:14, zIndex:100}}>
+          {toast.msg}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ModalDetalleCarpintero({carpintero, onCerrar, onAgregarEvento, onMarcarSinWhatsapp, onAbrirPrimerContacto, onAbrirSeguimiento, onEditar, onEliminar}){
+  const c = carpintero;
+  const clasificacionManual = (c.eventos||[]).find(e=>e.tipo!=="whatsapp");
+  const clasificacionAutoId = !clasificacionManual ? clasificacionDe(c) : null;
+  const clasificacionAuto = clasificacionAutoId ? Object.values(CLASIFICACION_AUTO).find(x=>x.id===clasificacionAutoId) : null;
+  const ultimoWhatsapp = (c.eventos||[]).find(e=>e.tipo==="whatsapp");
+  const {alerta, dias} = alertaSeguimientoDe(c);
+
+  return (
+    <div className="modal-overlay" style={{position:"fixed", inset:0, background:"rgba(10,20,35,0.5)", display:"flex", alignItems:"center", justifyContent:"center", zIndex:65, padding:16}} onClick={onCerrar}>
+      <div className="modal-box" style={{background:"#fff", borderRadius:14, padding:"20px 18px", width:460, maxWidth:"100%", maxHeight:"90vh", overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
+        <div style={{fontWeight:700, fontSize:16}}>{c.nombre}</div>
+        <div style={{fontSize:12.5, color:"var(--gris-500)", marginTop:3}}>
+          {c.localidad && <span>{c.localidad}{c.provincia ? ", "+c.provincia : ""}</span>}
+        </div>
+        {c.ruta && (
+          <span style={{display:"inline-block", fontSize:10.5, padding:"2px 8px", borderRadius:20, background:"var(--azul-100)", color:"var(--azul-700)", fontWeight:600, marginTop:5}}>
+            🛣️ {c.ruta}
+          </span>
+        )}
+        {c.domicilio && <div style={{fontSize:12, color:"var(--gris-500)", marginTop:4}}>{c.domicilio}</div>}
+        {(c.telefonos||[]).map(t=>(
+          <div key={t.id} style={{marginTop:4, display:"flex", alignItems:"center", gap:6}}>
+            {t.sinWhatsapp ? (
+              <span style={{fontSize:12.5, color:"var(--gris-500)"}}>
+                📵 {t.nombre ? `${t.nombre} — ${t.numero}` : t.numero} (sin WhatsApp)
+              </span>
+            ) : (
+              <a href={`https://wa.me/54${t.numero.replace(/[^0-9]/g,"")}`} target="_blank" rel="noopener"
+                style={{fontSize:12.5, color:"var(--verde-600)", textDecoration:"none", display:"inline-block", fontWeight:600}}>
+                📱 {t.nombre ? `${t.nombre} — ${t.numero}` : t.numero}
+              </a>
+            )}
+            <button onClick={()=>onMarcarSinWhatsapp(c.id, t.id, !t.sinWhatsapp)}
+              style={{fontSize:10, color:"var(--gris-500)", background:"none", border:"none", padding:0, textDecoration:"underline"}}>
+              {t.sinWhatsapp ? "deshacer" : "sin WhatsApp"}
+            </button>
+          </div>
+        ))}
+
+        {alerta && (
+          <div style={{marginTop:8, fontSize:11.5, color:"var(--rojo-600)", fontWeight:700, display:"flex", alignItems:"center", gap:4}}>
+            ⏰ hace {dias} días sin novedades
+          </div>
+        )}
+
+        {ultimoWhatsapp && (
+          <div style={{marginTop:8}}>
+            <div style={{display:"flex", alignItems:"center", gap:6, flexWrap:"wrap"}}>
+              <span style={{fontSize:10.5, padding:"2px 8px", borderRadius:20, fontWeight:700,
+                background: colorEvento(ultimoWhatsapp.tipo).bg, color: colorEvento(ultimoWhatsapp.tipo).fg}}>
+                {labelEvento(ultimoWhatsapp.tipo)}
+              </span>
+              <span style={{fontSize:11.5, color:"var(--gris-500)"}}>{fmtFechaCorta(ultimoWhatsapp.fecha)}</span>
+            </div>
+            {ultimoWhatsapp.comentario && (
+              <div style={{fontSize:12, color:"var(--gris-600)", marginTop:3, fontStyle:"italic"}}>
+                "{ultimoWhatsapp.comentario}"
+              </div>
+            )}
+          </div>
+        )}
+
+        {clasificacionManual && (
+          <div style={{marginTop:6}}>
+            <div style={{display:"flex", alignItems:"center", gap:6, flexWrap:"wrap"}}>
+              <span style={{fontSize:10.5, padding:"2px 8px", borderRadius:20, fontWeight:700,
+                background: colorEvento(clasificacionManual.tipo).bg, color: colorEvento(clasificacionManual.tipo).fg}}>
+                {labelEvento(clasificacionManual.tipo)}
+              </span>
+              <span style={{fontSize:11.5, color:"var(--gris-500)"}}>{fmtFechaCorta(clasificacionManual.fecha)}</span>
+            </div>
+            {clasificacionManual.comentario && (
+              <div style={{fontSize:12, color:"var(--gris-600)", marginTop:3, fontStyle:"italic"}}>
+                "{clasificacionManual.comentario}"
+              </div>
+            )}
+          </div>
+        )}
+
+        {!clasificacionManual && clasificacionAuto && (
+          <div style={{marginTop:6}}>
+            <span style={{fontSize:10.5, padding:"2px 8px", borderRadius:20, fontWeight:700,
+              background: colorEvento(clasificacionAuto.id).bg, color: colorEvento(clasificacionAuto.id).fg}}>
+              {clasificacionAuto.label} (auto)
+            </span>
+          </div>
+        )}
+
+        <div style={{display:"flex", gap:6, marginTop:10, paddingTop:10, borderTop:"1px solid var(--gris-100)", flexWrap:"wrap"}}>
+          {TIPOS_EVENTO.filter(t=>t.id!=="whatsapp").map(t=>(
+            <button key={t.id} onClick={()=>onAgregarEvento(c.id, {id: uid("ev"), fecha: new Date().toISOString(), tipo: t.id, comentario:""})}
+              style={{fontSize:11.5, padding:"4px 9px", borderRadius:20, border:"none", fontWeight:600,
+                background: colorEvento(t.id).bg, color: colorEvento(t.id).fg}}>
+              {t.label}
+            </button>
+          ))}
+        </div>
+
+        <div style={{display:"flex", gap:16, marginTop:12, paddingTop:8, alignItems:"center", flexWrap:"wrap"}}>
+          {(c.telefonos||[]).length>0 && (
+            <button onClick={()=>onAbrirPrimerContacto(c)} style={{fontSize:13, color:"var(--verde-700)", background:"none", border:"none", padding:0, fontWeight:600}}>
+              💬 Primer contacto
+            </button>
+          )}
+          <button onClick={()=>onAbrirSeguimiento(c)} style={{fontSize:13, color:"var(--verde-600)", background:"none", border:"none", padding:0, fontWeight:600}}>
+            Seguimiento {(c.eventos||[]).length>0 && `(${(c.eventos||[]).length})`}
+          </button>
+          <button onClick={()=>onEditar(c)} style={{fontSize:13, color:"var(--azul-600)", background:"none", border:"none", padding:0}}>Editar</button>
+          <button onClick={()=>onEliminar(c.id)} style={{fontSize:13, color:"var(--rojo-600)", background:"none", border:"none", padding:0}}>Eliminar</button>
+        </div>
+
+        <div style={{marginTop:16}}>
+          <button onClick={onCerrar} style={{width:"100%", padding:"10px", borderRadius:8, border:"1px solid var(--gris-300)", background:"#fff"}}>Cerrar</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ModalCarpintero({carpintero, onGuardar, onCerrar}){
+  const [form, setForm] = useState(carpintero || {
+    id: uid("carp"), nombre:"", domicilio:"", localidad:"", provincia:"", telefonos:[], ruta:""
+  });
+
+  function actualizar(campo, valor){ setForm(f=>({...f, [campo]: valor})); }
+
+  function actualizarTelefono(id, campo, valor){
+    setForm(f=>({...f, telefonos: (f.telefonos||[]).map(t=> t.id===id ? {...t, [campo]:valor} : t)}));
+  }
+
+  function agregarTelefono(){
+    setForm(f=>({...f, telefonos: [...(f.telefonos||[]), {id: uid("tel"), nombre:"", numero:""}]}));
+  }
+
+  function quitarTelefono(id){
+    setForm(f=>({...f, telefonos: (f.telefonos||[]).filter(t=>t.id!==id)}));
+  }
+
+  function confirmar(){
+    if(!form.nombre.trim()){ alert("Ingresá el nombre del carpintero."); return; }
+    const telefonosLimpios = (form.telefonos||[]).filter(t=>t.numero && t.numero.trim());
+    onGuardar({...form, nombre: form.nombre.trim(), telefonos: telefonosLimpios});
+  }
+
+  return (
+    <div className="modal-overlay" style={{position:"fixed", inset:0, background:"rgba(10,20,35,0.5)", display:"flex", alignItems:"center", justifyContent:"center", zIndex:50, padding:16}} onClick={onCerrar}>
+      <div className="modal-box" style={{background:"#fff", borderRadius:14, padding:"24px 22px", width:460, maxWidth:"100%", maxHeight:"90vh", overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
+        <h3 style={{marginTop:0, fontSize:17, fontWeight:700}}>{carpintero ? "Editar carpintero" : "Nuevo carpintero"}</h3>
+
+        <Campo label="Nombre">
+          <input value={form.nombre} onChange={e=>actualizar("nombre", e.target.value)} style={inputStyle} />
+        </Campo>
+
+        <Campo label="Domicilio">
+          <input value={form.domicilio} onChange={e=>actualizar("domicilio", e.target.value)} style={inputStyle} />
+        </Campo>
+
+        <div className="fila-campos" style={{display:"flex", gap:12}}>
+          <Campo label="Localidad">
+            <input value={form.localidad} onChange={e=>actualizar("localidad", e.target.value)} style={inputStyle} />
+          </Campo>
+          <Campo label="Provincia">
+            <input value={form.provincia} onChange={e=>actualizar("provincia", e.target.value)} style={inputStyle} />
+          </Campo>
+        </div>
+
+        <Campo label="Teléfonos">
+          {(form.telefonos||[]).map(t=>(
+            <div key={t.id} style={{display:"flex", gap:6, marginBottom:8, alignItems:"center"}}>
+              <input value={t.nombre} onChange={e=>actualizarTelefono(t.id,"nombre",e.target.value)}
+                style={{...inputStyle, flex:"1 1 90px"}} placeholder="Nombre (opcional)" />
+              <input value={t.numero} onChange={e=>actualizarTelefono(t.id,"numero",e.target.value)}
+                style={{...inputStyle, flex:"1 1 130px"}} placeholder="Ej: 3564510034" />
+              <button onClick={()=>quitarTelefono(t.id)} type="button"
+                style={{background:"none", border:"none", color:"var(--rojo-600)", fontSize:18, padding:"0 4px", flexShrink:0}}>✕</button>
+            </div>
+          ))}
+          <button onClick={agregarTelefono} type="button"
+            style={{fontSize:12.5, color:"var(--azul-600)", background:"none", border:"1px dashed var(--azul-500)", borderRadius:7, padding:"6px 10px", width:"100%"}}>
+            + Agregar teléfono
+          </button>
+        </Campo>
+
+        <Campo label="Ruta de acceso">
+          <select value={form.ruta||""} onChange={e=>actualizar("ruta", e.target.value)} style={inputStyle}>
+            <option value="">Sin especificar</option>
+            {RUTAS_ACCESO.map(r=> <option key={r} value={r}>{r}</option>)}
+          </select>
+        </Campo>
+
+        <label style={{display:"flex", alignItems:"center", gap:8, fontSize:13, color:"var(--gris-700)", marginBottom:18, cursor:"pointer"}}>
+          <input type="checkbox" checked={!!form.datosCompletos} onChange={e=>actualizar("datosCompletos", e.target.checked)}
+            style={{width:18, height:18}} />
+          Ya tengo sus datos fiscales (no volver a pedir)
+        </label>
+
+        <div style={{display:"flex", gap:10, marginTop:18}}>
+          <button onClick={onCerrar} style={{flex:1, padding:"10px", borderRadius:8, border:"1px solid var(--gris-300)", background:"#fff"}}>Cancelar</button>
+          <button onClick={confirmar} style={{flex:1, padding:"10px", borderRadius:8, border:"none", background:"var(--azul-600)", color:"#fff", fontWeight:600}}>Guardar</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ModalEventos({carpintero, onAgregar, onEliminar, onCerrar, comentariosPrevios}){
+  const [tipo, setTipo] = useState(TIPOS_EVENTO[0].id);
+  const [comentario, setComentario] = useState("");
+  const [fecha, setFecha] = useState(()=>{
+    const hoy = new Date();
+    const yyyy = hoy.getFullYear();
+    const mm = String(hoy.getMonth()+1).padStart(2,"0");
+    const dd = String(hoy.getDate()).padStart(2,"0");
+    return `${yyyy}-${mm}-${dd}`;
+  });
+
+  const eventos = carpintero.eventos || [];
+
+  function agregar(){
+    // Tomamos la fecha elegida (yyyy-mm-dd) y le sumamos la hora actual,
+    // así el orden de "último contacto" sigue siendo preciso dentro del mismo día.
+    const ahora = new Date();
+    const [y,m,d] = fecha.split("-").map(Number);
+    const fechaFinal = new Date(y, m-1, d, ahora.getHours(), ahora.getMinutes(), ahora.getSeconds());
+    onAgregar({
+      id: uid("ev"),
+      fecha: fechaFinal.toISOString(),
+      tipo,
+      comentario: comentario.trim()
+    });
+    setComentario("");
+  }
+
+  return (
+    <div className="modal-overlay" style={{position:"fixed", inset:0, background:"rgba(10,20,35,0.5)", display:"flex", alignItems:"center", justifyContent:"center", zIndex:50, padding:16}} onClick={onCerrar}>
+      <div className="modal-box" style={{background:"#fff", borderRadius:14, padding:"24px 22px", width:480, maxWidth:"100%", maxHeight:"90vh", overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
+        <h3 style={{marginTop:0, fontSize:16, fontWeight:700, marginBottom:2}}>Seguimiento</h3>
+        <p style={{fontSize:13, color:"var(--gris-500)", marginTop:0, marginBottom:16}}>{carpintero.nombre}</p>
+
+        <div style={{background:"var(--gris-50)", borderRadius:10, padding:14, marginBottom:18}}>
+          <Campo label="¿Qué pasó?">
+            <select value={tipo} onChange={e=>setTipo(e.target.value)} style={inputStyle}>
+              {TIPOS_EVENTO.map(t=> <option key={t.id} value={t.id}>{t.label}</option>)}
+            </select>
+          </Campo>
+          <Campo label="Fecha">
+            <input type="date" value={fecha} onChange={e=>setFecha(e.target.value)} style={inputStyle} />
+          </Campo>
+          <Campo label="Comentario (opcional)">
+            <ComboComentario value={comentario} onChange={setComentario} comentariosPrevios={comentariosPrevios||[]} placeholder="Alguna nota sobre este contacto..." />
+          </Campo>
+          <button onClick={agregar} style={{width:"100%", padding:"9px", borderRadius:8, border:"none", background:"var(--verde-600)", color:"#fff", fontWeight:600, fontSize:13.5}}>
+            + Registrar evento
+          </button>
+        </div>
+
+        {eventos.length===0 ? (
+          <div style={{textAlign:"center", padding:"20px 10px", color:"var(--gris-500)", fontSize:13}}>
+            Todavía no registraste ningún contacto con este carpintero.
+          </div>
+        ) : (
+          <div>
+            <div style={{fontSize:12.5, fontWeight:600, color:"var(--gris-700)", marginBottom:8}}>Historial ({eventos.length})</div>
+            {eventos.map(ev=>(
+              <div key={ev.id} style={{borderBottom:"1px solid var(--gris-100)", padding:"10px 0"}}>
+                <div style={{display:"flex", justifyContent:"space-between", alignItems:"flex-start", gap:8}}>
+                  <div style={{flex:1, minWidth:0}}>
+                    <span style={{fontSize:11, padding:"2px 8px", borderRadius:20, fontWeight:700,
+                      background: colorEvento(ev.tipo).bg, color: colorEvento(ev.tipo).fg}}>
+                      {labelEvento(ev.tipo)}
+                    </span>
+                    <div style={{fontSize:11.5, color:"var(--gris-500)", marginTop:4}}>{fmtFechaCompleta(ev.fecha)}</div>
+                    {ev.comentario && <div style={{fontSize:13, color:"var(--gris-700)", marginTop:4}}>{ev.comentario}</div>}
+                  </div>
+                  <button onClick={()=>onEliminar(ev.id)} style={{background:"none", border:"none", color:"var(--rojo-600)", fontSize:12, padding:0, flexShrink:0}}>Eliminar</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div style={{marginTop:18}}>
+          <button onClick={onCerrar} style={{width:"100%", padding:"10px", borderRadius:8, border:"1px solid var(--gris-300)", background:"#fff"}}>Cerrar</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ModalEventoMasivo({cantidad, onAplicar, onCerrar, comentariosPrevios}){
+  const [tipo, setTipo] = useState(TIPOS_EVENTO[0].id);
+  const [comentario, setComentario] = useState("");
+  const [fecha, setFecha] = useState(()=>{
+    const hoy = new Date();
+    const yyyy = hoy.getFullYear();
+    const mm = String(hoy.getMonth()+1).padStart(2,"0");
+    const dd = String(hoy.getDate()).padStart(2,"0");
+    return `${yyyy}-${mm}-${dd}`;
+  });
+
+  function aplicar(){
+    const ahora = new Date();
+    const [y,m,d] = fecha.split("-").map(Number);
+    const fechaFinal = new Date(y, m-1, d, ahora.getHours(), ahora.getMinutes(), ahora.getSeconds());
+    onAplicar({
+      fecha: fechaFinal.toISOString(),
+      tipo,
+      comentario: comentario.trim()
+    });
+  }
+
+  return (
+    <div className="modal-overlay" style={{position:"fixed", inset:0, background:"rgba(10,20,35,0.5)", display:"flex", alignItems:"center", justifyContent:"center", zIndex:70, padding:16}} onClick={onCerrar}>
+      <div className="modal-box" style={{background:"#fff", borderRadius:14, padding:"24px 22px", width:460, maxWidth:"100%", maxHeight:"90vh", overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
+        <h3 style={{marginTop:0, fontSize:17, fontWeight:700}}>Aplicar evento masivo</h3>
+        <p style={{fontSize:13, color:"var(--gris-500)", marginTop:0, marginBottom:16}}>
+          Se va a registrar en {cantidad} carpinteros seleccionados.
+        </p>
+
+        <Campo label="¿Qué pasó?">
+          <select value={tipo} onChange={e=>setTipo(e.target.value)} style={inputStyle}>
+            {TIPOS_EVENTO.map(t=> <option key={t.id} value={t.id}>{t.label}</option>)}
+          </select>
+        </Campo>
+        <Campo label="Fecha">
+          <input type="date" value={fecha} onChange={e=>setFecha(e.target.value)} style={inputStyle} />
+        </Campo>
+        <Campo label="Comentario (opcional)">
+          <ComboComentario value={comentario} onChange={setComentario} comentariosPrevios={comentariosPrevios||[]} placeholder="Ej: Aviso de viaje a la zona..." />
+        </Campo>
+
+        <div style={{display:"flex", gap:10, marginTop:18}}>
+          <button onClick={onCerrar} style={{flex:1, padding:"10px", borderRadius:8, border:"1px solid var(--gris-300)", background:"#fff"}}>Cancelar</button>
+          <button onClick={aplicar} style={{flex:1, padding:"10px", borderRadius:8, border:"none", background:"var(--verde-600)", color:"#fff", fontWeight:600}}>
+            Aplicar a {cantidad}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SelectorViaje({modo, setModo, diasElegidos, setDiasElegidos}){
+  function alternarDia(dia){
+    setDiasElegidos(prev => prev.includes(dia) ? prev.filter(d=>d!==dia) : [...prev, dia]);
+  }
+  return (
+    <div style={{background:"var(--azul-50)", border:"1px solid var(--azul-100)", borderRadius:10, padding:12, marginBottom:14}}>
+      <div style={{fontSize:12.5, fontWeight:600, color:"var(--gris-700)", marginBottom:8}}>¿Cuándo viajamos?</div>
+      <div style={{display:"flex", gap:8, marginBottom:10}}>
+        <button type="button" onClick={()=>setModo("esta_semana")}
+          style={{flex:1, padding:"8px", borderRadius:8, border: modo==="esta_semana" ? "none" : "1px solid var(--gris-300)",
+            background: modo==="esta_semana" ? "var(--azul-600)" : "#fff", color: modo==="esta_semana" ? "#fff" : "var(--gris-700)",
+            fontSize:12.5, fontWeight:600}}>
+          Esta semana
+        </button>
+        <button type="button" onClick={()=>setModo("semana_que_viene")}
+          style={{flex:1, padding:"8px", borderRadius:8, border: modo==="semana_que_viene" ? "none" : "1px solid var(--gris-300)",
+            background: modo==="semana_que_viene" ? "var(--azul-600)" : "#fff", color: modo==="semana_que_viene" ? "#fff" : "var(--gris-700)",
+            fontSize:12.5, fontWeight:600}}>
+          La semana que viene
+        </button>
+      </div>
+      {modo==="esta_semana" && (
+        <div>
+          <div style={{fontSize:11.5, color:"var(--gris-500)", marginBottom:6}}>Elegí uno o varios días:</div>
+          <div style={{display:"flex", gap:6, flexWrap:"wrap"}}>
+            {DIAS_SEMANA.map(dia=>(
+              <button key={dia} type="button" onClick={()=>alternarDia(dia)}
+                style={{padding:"6px 12px", borderRadius:20, border: diasElegidos.includes(dia) ? "none" : "1px solid var(--gris-300)",
+                  background: diasElegidos.includes(dia) ? "var(--verde-600)" : "#fff", color: diasElegidos.includes(dia) ? "#fff" : "var(--gris-700)",
+                  fontSize:12, fontWeight:600}}>
+                {dia}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ModalPrimerContacto({carpintero, onCerrar, onRegistrarEnvio, onMarcarDatosCompletos}){
+  const telefonos = carpintero.telefonos || [];
+  const [telefonoElegido, setTelefonoElegido] = useState(telefonos[0]?.id || "");
+  const [enviados, setEnviados] = useState(()=> new Set());
+  const [etapa, setEtapa] = useState("primero"); // "primero" | "segundo" | "tercero" | "datos" | "viaje"
+  const [modoViaje, setModoViaje] = useState("esta_semana");
+  const [diasViaje, setDiasViaje] = useState([]);
+
+  const telSeleccionado = telefonos.find(t=>t.id===telefonoElegido) || telefonos[0];
+
+  // El saludo se calcula una sola vez al abrir el modal (no se recalcula en cada
+  // render), combinado con los mensajes fijos de siempre.
+  const mensajesPrimero = useMemo(()=> [
+    {tipo:"whatsapp", texto: saludoSegunHora()},
+    ...MENSAJES_PRIMER_CONTACTO,
+  ], []);
+
+  const mensajesViaje = useMemo(()=> [
+    {tipo:"whatsapp", texto: saludoSegunHora()},
+    {tipo:"whatsapp", texto: mensajeNotificacionViaje(modoViaje, diasViaje)},
+  ], [modoViaje, diasViaje]);
+
+  const mensajes = etapa==="primero" ? mensajesPrimero
+    : etapa==="segundo" ? MENSAJES_SEGUNDO_CONTACTO
+    : etapa==="tercero" ? MENSAJES_TERCER_CONTACTO
+    : etapa==="datos" ? MENSAJES_PEDIDO_DATOS
+    : mensajesViaje;
+
+  const NOMBRE_ETAPA = {
+    primero: "Primer contacto",
+    segundo: "Segundo contacto",
+    tercero: "Tercer contacto",
+    datos: "Datos solicitados",
+    viaje: "Notificación de viaje",
+  };
+
+  function abrirMensaje(index, texto){
+    if(!telSeleccionado) return;
+    const numero = telSeleccionado.numero.replace(/[^0-9]/g,"");
+    const url = `https://wa.me/54${numero}?text=${encodeURIComponent(texto)}`;
+    window.open(url, "_blank", "noopener");
+    setEnviados(prev=> new Set(prev).add(etapa+"_"+index));
+    if(onRegistrarEnvio){
+      onRegistrarEnvio({
+        id: uid("ev"),
+        fecha: new Date().toISOString(),
+        tipo: "whatsapp",
+        comentario: `${NOMBRE_ETAPA[etapa]} — Mensaje ${index+1} de ${mensajes.length}`,
+      });
+    }
+  }
+
+  function marcarDatosCompletos(){
+    if(onMarcarDatosCompletos) onMarcarDatosCompletos(true);
+    setEtapa("primero");
+  }
+
+  return (
+    <div className="modal-overlay" style={{position:"fixed", inset:0, background:"rgba(10,20,35,0.5)", display:"flex", alignItems:"center", justifyContent:"center", zIndex:70, padding:16}} onClick={onCerrar}>
+      <div className="modal-box" style={{background:"#fff", borderRadius:14, padding:"24px 22px", width:480, maxWidth:"100%", maxHeight:"90vh", overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
+        <h3 style={{marginTop:0, fontSize:17, fontWeight:700, marginBottom:2}}>Mensajes de contacto</h3>
+        <p style={{fontSize:13, color:"var(--gris-500)", marginTop:0, marginBottom:16}}>{carpintero.nombre}</p>
+
+        <div style={{display:"flex", gap:6, marginBottom:16, borderBottom:"1px solid var(--gris-200)", flexWrap:"wrap"}}>
+          <button onClick={()=>setEtapa("primero")}
+            style={{flex:"1 1 auto", padding:"9px 4px", border:"none", background:"none", fontSize:12.5, fontWeight:600,
+              color: etapa==="primero" ? "var(--azul-600)" : "var(--gris-500)",
+              borderBottom: etapa==="primero" ? "2px solid var(--azul-600)" : "2px solid transparent"}}>
+            1️⃣ Primer contacto
+          </button>
+          <button onClick={()=>setEtapa("segundo")}
+            style={{flex:"1 1 auto", padding:"9px 4px", border:"none", background:"none", fontSize:12.5, fontWeight:600,
+              color: etapa==="segundo" ? "var(--azul-600)" : "var(--gris-500)",
+              borderBottom: etapa==="segundo" ? "2px solid var(--azul-600)" : "2px solid transparent"}}>
+            2️⃣ Cuando responda
+          </button>
+          <button onClick={()=>setEtapa("tercero")}
+            style={{flex:"1 1 auto", padding:"9px 4px", border:"none", background:"none", fontSize:12.5, fontWeight:600,
+              color: etapa==="tercero" ? "var(--azul-600)" : "var(--gris-500)",
+              borderBottom: etapa==="tercero" ? "2px solid var(--azul-600)" : "2px solid transparent"}}>
+            3️⃣ Le interesa Bronzen
+          </button>
+          {!carpintero.datosCompletos && (
+            <button onClick={()=>setEtapa("datos")}
+              style={{flex:"1 1 auto", padding:"9px 4px", border:"none", background:"none", fontSize:12.5, fontWeight:600,
+                color: etapa==="datos" ? "var(--azul-600)" : "var(--gris-500)",
+                borderBottom: etapa==="datos" ? "2px solid var(--azul-600)" : "2px solid transparent"}}>
+              📋 Pedido de datos
+            </button>
+          )}
+          <button onClick={()=>setEtapa("viaje")}
+            style={{flex:"1 1 auto", padding:"9px 4px", border:"none", background:"none", fontSize:12.5, fontWeight:600,
+              color: etapa==="viaje" ? "var(--azul-600)" : "var(--gris-500)",
+              borderBottom: etapa==="viaje" ? "2px solid var(--azul-600)" : "2px solid transparent"}}>
+            🚚 Notificación de viaje
+          </button>
+        </div>
+
+        {telefonos.length > 1 && (
+          <div style={{marginBottom:16}}>
+            <label style={{display:"block", fontSize:12.5, color:"var(--gris-700)", marginBottom:5, fontWeight:600}}>Enviar al teléfono:</label>
+            <select value={telefonoElegido} onChange={e=>setTelefonoElegido(e.target.value)} style={inputStyle}>
+              {telefonos.map(t=> <option key={t.id} value={t.id}>{t.nombre ? `${t.nombre} — ${t.numero}` : t.numero}</option>)}
+            </select>
+          </div>
+        )}
+
+        {etapa==="viaje" && (
+          <SelectorViaje modo={modoViaje} setModo={setModoViaje} diasElegidos={diasViaje} setDiasElegidos={setDiasViaje} />
+        )}
+
+        <p style={{fontSize:12.5, color:"var(--gris-500)", marginBottom:14}}>
+          Tocá cada mensaje para abrirlo en WhatsApp ya cargado. Revisalo y tocá enviar allá. Después volvé acá para el siguiente.
+        </p>
+
+        <div style={{display:"flex", flexDirection:"column", gap:10}}>
+          {mensajes.map((m, i)=>{
+            const key = etapa+"_"+i;
+            const esRecordatorio = m.tipo === "recordatorio";
+            return (
+              <button key={key} onClick={()=> !esRecordatorio && abrirMensaje(i, m.texto)}
+                style={{textAlign:"left", padding:"12px 14px", borderRadius:10,
+                  border: esRecordatorio ? "1px dashed var(--ambar-600)" : (enviados.has(key) ? "1px solid var(--verde-500)" : "1px solid var(--gris-200)"),
+                  background: esRecordatorio ? "var(--ambar-100)" : (enviados.has(key) ? "var(--verde-50)" : "var(--gris-50)"),
+                  fontSize:13.5, lineHeight:1.4, color:"var(--gris-800)", cursor: esRecordatorio ? "default" : "pointer"}}>
+                <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:4}}>
+                  <span style={{fontSize:11, fontWeight:700, color: esRecordatorio ? "var(--ambar-600)" : "var(--verde-700)"}}>
+                    {esRecordatorio ? "📎 Recordatorio" : `Mensaje ${i+1} de ${mensajes.length}`}
+                  </span>
+                  {!esRecordatorio && enviados.has(key) && <span style={{fontSize:11, color:"var(--verde-600)", fontWeight:700}}>✓ Enviado</span>}
+                </div>
+                {m.texto}
+              </button>
+            );
+          })}
+        </div>
+
+        {etapa==="datos" && (
+          <button onClick={marcarDatosCompletos}
+            style={{width:"100%", padding:"10px", borderRadius:8, border:"none", background:"var(--verde-600)", color:"#fff", fontWeight:600, fontSize:13.5, marginTop:10}}>
+            ✓ Ya tengo estos datos
+          </button>
+        )}
+
+        <div style={{marginTop:18}}>
+          <button onClick={onCerrar} style={{width:"100%", padding:"10px", borderRadius:8, border:"1px solid var(--gris-300)", background:"#fff"}}>Cerrar</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ModalEnvioMasivo({carpinteros, onRegistrarEnvio, onCerrar}){
+  const [indice, setIndice] = useState(0);
+  const [etapa, setEtapa] = useState("primero"); // "primero" | "segundo" | "tercero" | "viaje"
+  const [enviados, setEnviados] = useState(()=> new Set()); // claves: "carpinteroId_etapa_mensajeIndex"
+  const [modoViaje, setModoViaje] = useState("esta_semana");
+  const [diasViaje, setDiasViaje] = useState([]);
+
+  const carpintero = carpinteros[indice];
+  const telefono = carpintero?.telefonos?.[0]; // primer teléfono cargado, automático
+
+  const mensajesPrimero = useMemo(()=> [
+    {tipo:"whatsapp", texto: saludoSegunHora()},
+    ...MENSAJES_PRIMER_CONTACTO,
+  ], []);
+
+  const mensajesViaje = useMemo(()=> [
+    {tipo:"whatsapp", texto: saludoSegunHora()},
+    {tipo:"whatsapp", texto: mensajeNotificacionViaje(modoViaje, diasViaje)},
+  ], [modoViaje, diasViaje]);
+
+  const mensajes = etapa==="primero" ? mensajesPrimero
+    : etapa==="segundo" ? MENSAJES_SEGUNDO_CONTACTO
+    : etapa==="tercero" ? MENSAJES_TERCER_CONTACTO
+    : mensajesViaje;
+
+  const NOMBRE_ETAPA = {
+    primero: "Primer contacto",
+    segundo: "Segundo contacto",
+    tercero: "Tercer contacto",
+    viaje: "Notificación de viaje",
+  };
+
+  function claveEnviado(i){ return `${carpintero.id}_${etapa}_${i}`; }
+
+  function abrirMensaje(i, texto){
+    if(!telefono) return;
+    const numero = telefono.numero.replace(/[^0-9]/g,"");
+    const url = `https://wa.me/54${numero}?text=${encodeURIComponent(texto)}`;
+    window.open(url, "_blank", "noopener");
+    setEnviados(prev=> new Set(prev).add(claveEnviado(i)));
+    onRegistrarEnvio(carpintero.id, {
+      id: uid("ev"),
+      fecha: new Date().toISOString(),
+      tipo: "whatsapp",
+      comentario: `${NOMBRE_ETAPA[etapa]} — Mensaje ${i+1} de ${mensajes.length}`,
+    });
+  }
+
+  function irASiguiente(){
+    if(indice < carpinteros.length - 1){
+      setIndice(i=>i+1);
+    } else {
+      onCerrar();
+    }
+  }
+
+  function irAAnterior(){
+    if(indice > 0) setIndice(i=>i-1);
+  }
+
+  if(!carpintero) return null;
+
+  return (
+    <div className="modal-overlay" style={{position:"fixed", inset:0, background:"rgba(10,20,35,0.5)", display:"flex", alignItems:"center", justifyContent:"center", zIndex:70, padding:16}} onClick={onCerrar}>
+      <div className="modal-box" style={{background:"#fff", borderRadius:14, padding:"24px 22px", width:480, maxWidth:"100%", maxHeight:"90vh", overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
+        <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:2}}>
+          <h3 style={{margin:0, fontSize:17, fontWeight:700}}>Envío masivo</h3>
+          <span style={{fontSize:12.5, color:"var(--gris-500)", fontWeight:600}}>{indice+1} de {carpinteros.length}</span>
+        </div>
+        <p style={{fontSize:14, color:"var(--gris-800)", marginTop:6, marginBottom:2, fontWeight:700}}>{carpintero.nombre}</p>
+        <p style={{fontSize:12.5, color:"var(--gris-500)", marginTop:0, marginBottom:16}}>
+          {telefono ? (telefono.nombre ? `${telefono.nombre} — ${telefono.numero}` : telefono.numero) : "⚠️ Sin teléfono cargado"}
+        </p>
+
+        <div style={{display:"flex", gap:6, marginBottom:16, borderBottom:"1px solid var(--gris-200)", flexWrap:"wrap"}}>
+          <button onClick={()=>setEtapa("primero")}
+            style={{flex:"1 1 auto", padding:"9px 4px", border:"none", background:"none", fontSize:12.5, fontWeight:600,
+              color: etapa==="primero" ? "var(--azul-600)" : "var(--gris-500)",
+              borderBottom: etapa==="primero" ? "2px solid var(--azul-600)" : "2px solid transparent"}}>
+            1️⃣ Primer contacto
+          </button>
+          <button onClick={()=>setEtapa("segundo")}
+            style={{flex:"1 1 auto", padding:"9px 4px", border:"none", background:"none", fontSize:12.5, fontWeight:600,
+              color: etapa==="segundo" ? "var(--azul-600)" : "var(--gris-500)",
+              borderBottom: etapa==="segundo" ? "2px solid var(--azul-600)" : "2px solid transparent"}}>
+            2️⃣ Cuando responda
+          </button>
+          <button onClick={()=>setEtapa("tercero")}
+            style={{flex:"1 1 auto", padding:"9px 4px", border:"none", background:"none", fontSize:12.5, fontWeight:600,
+              color: etapa==="tercero" ? "var(--azul-600)" : "var(--gris-500)",
+              borderBottom: etapa==="tercero" ? "2px solid var(--azul-600)" : "2px solid transparent"}}>
+            3️⃣ Le interesa Bronzen
+          </button>
+          <button onClick={()=>setEtapa("viaje")}
+            style={{flex:"1 1 auto", padding:"9px 4px", border:"none", background:"none", fontSize:12.5, fontWeight:600,
+              color: etapa==="viaje" ? "var(--azul-600)" : "var(--gris-500)",
+              borderBottom: etapa==="viaje" ? "2px solid var(--azul-600)" : "2px solid transparent"}}>
+            🚚 Notificación de viaje
+          </button>
+        </div>
+
+        {etapa==="viaje" && (
+          <SelectorViaje modo={modoViaje} setModo={setModoViaje} diasElegidos={diasViaje} setDiasElegidos={setDiasViaje} />
+        )}
+
+        {!telefono && (
+          <div style={{background:"var(--rojo-50)", border:"1px solid var(--rojo-500)", borderRadius:10, padding:12, marginBottom:14, fontSize:13, color:"var(--rojo-700)"}}>
+            Este carpintero no tiene teléfono cargado. Tocá "Siguiente" para pasar al próximo, o cerrá y completá su teléfono desde "Editar".
+          </div>
+        )}
+
+        <div style={{display:"flex", flexDirection:"column", gap:10}}>
+          {mensajes.map((m, i)=>{
+            const key = claveEnviado(i);
+            const esRecordatorio = m.tipo === "recordatorio";
+            return (
+              <button key={key} disabled={!telefono} onClick={()=> !esRecordatorio && abrirMensaje(i, m.texto)}
+                style={{textAlign:"left", padding:"12px 14px", borderRadius:10,
+                  border: esRecordatorio ? "1px dashed var(--ambar-600)" : (enviados.has(key) ? "1px solid var(--verde-500)" : "1px solid var(--gris-200)"),
+                  background: esRecordatorio ? "var(--ambar-100)" : (enviados.has(key) ? "var(--verde-50)" : "var(--gris-50)"),
+                  fontSize:13.5, lineHeight:1.4, color:"var(--gris-800)", cursor: (esRecordatorio || !telefono) ? "default" : "pointer",
+                  opacity: telefono ? 1 : 0.6}}>
+                <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:4}}>
+                  <span style={{fontSize:11, fontWeight:700, color: esRecordatorio ? "var(--ambar-600)" : "var(--verde-700)"}}>
+                    {esRecordatorio ? "📎 Recordatorio" : `Mensaje ${i+1} de ${mensajes.length}`}
+                  </span>
+                  {!esRecordatorio && enviados.has(key) && <span style={{fontSize:11, color:"var(--verde-600)", fontWeight:700}}>✓ Enviado</span>}
+                </div>
+                {m.texto}
+              </button>
+            );
+          })}
+        </div>
+
+        <div style={{display:"flex", gap:10, marginTop:18}}>
+          <button onClick={irAAnterior} disabled={indice===0}
+            style={{flex:1, padding:"10px", borderRadius:8, border:"1px solid var(--gris-300)", background:"#fff", opacity: indice===0 ? 0.5 : 1}}>
+            ← Anterior
+          </button>
+          <button onClick={irASiguiente}
+            style={{flex:1, padding:"10px", borderRadius:8, border:"none", background:"var(--verde-600)", color:"#fff", fontWeight:600}}>
+            {indice < carpinteros.length-1 ? "Siguiente →" : "Terminar"}
+          </button>
+        </div>
+        <div style={{marginTop:10}}>
+          <button onClick={onCerrar} style={{width:"100%", padding:"9px", borderRadius:8, border:"none", background:"none", color:"var(--gris-500)", fontSize:12.5}}>
+            Cerrar sin terminar
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Combo para elegir un comentario ya usado antes, o escribir uno nuevo.
+// value/onChange funcionan como un input de texto normal para quien lo usa por fuera.
+const NUEVA_NOTA = "__nueva_nota__";
+
+function ComboComentario({value, onChange, comentariosPrevios, placeholder}){
+  const [modoNuevo, setModoNuevo] = useState(!value || !comentariosPrevios.includes(value));
+
+  function manejarSelect(e){
+    const v = e.target.value;
+    if(v === NUEVA_NOTA){
+      setModoNuevo(true);
+      onChange("");
+    } else {
+      setModoNuevo(false);
+      onChange(v);
+    }
+  }
+
+  if(comentariosPrevios.length === 0 || modoNuevo){
+    return (
+      <div>
+        <textarea value={value} onChange={e=>onChange(e.target.value)} rows={2}
+          style={{...inputStyle, resize:"vertical"}} placeholder={placeholder} />
+        {comentariosPrevios.length > 0 && (
+          <button type="button" onClick={()=>setModoNuevo(false)}
+            style={{fontSize:12, color:"var(--azul-600)", background:"none", border:"none", padding:"4px 0 0 0"}}>
+            ← Elegir una nota ya usada
+          </button>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <select value={value} onChange={manejarSelect} style={inputStyle}>
+      <option value="">Sin comentario</option>
+      {comentariosPrevios.map(c=> <option key={c} value={c}>{c}</option>)}
+      <option value={NUEVA_NOTA}>✎ Escribir nueva nota...</option>
+    </select>
+  );
+}
+
+function Campo({label, children}){
+  return (
+    <div style={{marginBottom:14}}>
+      <label style={{display:"block", fontSize:12.5, color:"var(--gris-700)", marginBottom:5, fontWeight:600}}>{label}</label>
+      {children}
+    </div>
+  );
+}
+
+const inputStyle = {width:"100%", padding:"9px 11px", borderRadius:7, border:"1px solid var(--gris-300)", fontSize:14};
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
+</body>
+</html>
