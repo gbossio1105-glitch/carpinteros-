@@ -12,6 +12,31 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+  import { getFirestore, doc, getDoc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyCDTLUEF6LlTxqT-E8qVOugQZPs8FmxjGw",
+    authDomain: "carpinterossb.firebaseapp.com",
+    projectId: "carpinterossb",
+    storageBucket: "carpinterossb.firebasestorage.app",
+    messagingSenderId: "667317587912",
+    appId: "1:667317587912:web:aca573c371f9bdbbb53afd"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
+
+  // Exponemos estas funciones en window para que el script de React (que no
+  // es un módulo ES, así que no puede usar "import" directamente) las use.
+  window.__firestoreDb = db;
+  window.__firestoreDoc = doc;
+  window.__firestoreGetDoc = getDoc;
+  window.__firestoreSetDoc = setDoc;
+  window.__firestoreOnSnapshot = onSnapshot;
+  window.__firestoreReady = true;
+</script>
 <style>
   :root{
     --azul-900:#0a2540; --azul-800:#0e3661; --azul-700:#134a86; --azul-600:#1a5fa8;
@@ -67,17 +92,75 @@ function fmtFechaCompleta(iso){
   return d.toLocaleDateString("es-AR", {day:"2-digit", month:"2-digit", year:"numeric"}) + " " + d.toLocaleTimeString("es-AR", {hour:"2-digit", minute:"2-digit"});
 }
 
+// Esperamos hasta que el script de módulo (arriba en el head) haya terminado
+// de inicializar Firebase y expuesto las funciones en window.
+function esperarFirebase(){
+  return new Promise((resolve)=>{
+    if(window.__firestoreReady) return resolve();
+    const intervalo = setInterval(()=>{
+      if(window.__firestoreReady){
+        clearInterval(intervalo);
+        resolve();
+      }
+    }, 50);
+  });
+}
+
+// El documento único donde guardamos toda la base (simple y suficiente para
+// nuestro volumen de datos). Colección "carpinteros_app", documento "datos".
 async function storageGet(key){
   try{
+    await esperarFirebase();
+    const ref = window.__firestoreDoc(window.__firestoreDb, "carpinteros_app", key);
+    const snap = await window.__firestoreGetDoc(ref);
+    if(snap.exists()){
+      const datos = snap.data();
+      // Guardamos también una copia local como respaldo offline.
+      try{ window.localStorage.setItem(key, JSON.stringify(datos)); }catch(e){}
+      return datos;
+    }
+    // Si no hay nada en Firestore todavía, probamos con la copia local vieja
+    // (por si el usuario ya tenía datos guardados antes de esta migración).
     const raw = window.localStorage.getItem(key);
     return raw ? JSON.parse(raw) : null;
-  }catch(e){ return null; }
+  }catch(e){
+    console.error("storage get error (usando copia local si existe)", key, e);
+    try{
+      const raw = window.localStorage.getItem(key);
+      return raw ? JSON.parse(raw) : null;
+    }catch(e2){ return null; }
+  }
 }
+
 async function storageSet(key, value){
+  // Guardamos localmente primero, así la app sigue funcionando aunque no haya
+  // internet en ese momento.
+  try{ window.localStorage.setItem(key, JSON.stringify(value)); }catch(e){}
   try{
-    window.localStorage.setItem(key, JSON.stringify(value));
+    await esperarFirebase();
+    const ref = window.__firestoreDoc(window.__firestoreDb, "carpinteros_app", key);
+    await window.__firestoreSetDoc(ref, value);
     return true;
-  }catch(e){ console.error("storage set error", key, e); return false; }
+  }catch(e){
+    console.error("storage set error (Firestore) — quedó guardado solo local por ahora", key, e);
+    return false;
+  }
+}
+
+// Suscribe una función que se ejecuta cada vez que los datos cambian en
+// Firestore (incluyendo cambios hechos desde OTRO dispositivo). Devuelve una
+// función para cancelar la suscripción.
+function suscribirseACambios(key, callback){
+  let cancelado = false;
+  let unsubscribe = null;
+  esperarFirebase().then(()=>{
+    if(cancelado) return;
+    const ref = window.__firestoreDoc(window.__firestoreDb, "carpinteros_app", key);
+    unsubscribe = window.__firestoreOnSnapshot(ref, (snap)=>{
+      if(snap.exists()) callback(snap.data());
+    });
+  });
+  return ()=>{ cancelado = true; if(unsubscribe) unsubscribe(); };
 }
 
 const TIPOS_EVENTO = [
@@ -339,6 +422,21 @@ function App(){
       setDb(data);
       setCargando(false);
     })();
+  }, []);
+
+  // Suscripción en tiempo real: si los datos cambian en Firestore desde OTRO
+  // dispositivo (ej: la compu), este celu se actualiza solo, sin recargar.
+  useEffect(()=>{
+    const cancelar = suscribirseACambios("carpinteros_v1", (datosNuevos)=>{
+      setDb(prev=>{
+        // Evitamos un re-render/parpadeo innecesario si son exactamente los
+        // mismos datos que ya tenemos (por ejemplo, el eco de nuestra propia
+        // escritura reciente).
+        if(prev && JSON.stringify(prev) === JSON.stringify(datosNuevos)) return prev;
+        return datosNuevos;
+      });
+    });
+    return cancelar;
   }, []);
 
   const guardarDb = useCallback(async (nuevaDb) => {
