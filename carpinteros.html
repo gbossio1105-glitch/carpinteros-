@@ -167,9 +167,27 @@ const TIPOS_EVENTO = [
   {id:"whatsapp", label:"WhatsApp enviado", color:"verde"},
   {id:"compro", label:"Compró", color:"verde"},
   {id:"pidio_presupuesto", label:"Pidió presupuesto", color:"azul"},
-  {id:"contesto_cordial", label:"Contestó cordialmente", color:"azul"},
-  {id:"no_contesto", label:"No contestó", color:"ambar"},
 ];
+
+// Clasificaciones automáticas: el sistema las calcula solo, no se tildan a
+// mano. "Contestó" se infiere de que ya se avanzó a mandar mensajes de la
+// etapa "Segundo contacto" o posterior (eso solo puede pasar si el carpintero
+// respondió algo). "No contestó" es lo contrario: solo hay mensajes de
+// "Primer contacto" y ya pasó el tiempo de espera para esa clasificación.
+const CLASIFICACION_AUTO = {
+  CONTESTO: {id:"contesto_auto", label:"Contestó", color:"azul"},
+  NO_CONTESTO: {id:"no_contesto_auto", label:"No contestó", color:"ambar"},
+};
+
+// Umbral de días sin novedades antes de mostrar la alerta de seguimiento,
+// según la clasificación actual del carpintero (manual o automática).
+const DIAS_ALERTA_POR_CLASIFICACION = {
+  "pidio_presupuesto": 5,
+  "sin_contacto": 5,
+  "contesto_auto": 15,
+  "no_contesto_auto": 15,
+  "compro": 30,
+};
 
 const RUTAS_ACCESO = [
   "San Francisco",
@@ -260,17 +278,64 @@ function etapaContactoDe(carpintero){
   return "Sin contacto";
 }
 
-// Determina la clasificación más reciente de la conversación (Compró, Pidió
-// presupuesto, Contestó cordialmente, No contestó), ignorando los eventos
-// automáticos de "WhatsApp enviado".
-function clasificacionDe(carpintero){
+// Determina la clasificación manual más reciente (Compró o Pidió presupuesto)
+// ignorando los eventos automáticos de "WhatsApp enviado". Devuelve null si
+// nunca se tildó ninguna de las dos.
+function clasificacionManualDe(carpintero){
   const eventos = carpintero.eventos || [];
   const ev = eventos.find(e => e.tipo !== "whatsapp");
   return ev ? ev.tipo : null;
 }
 
+// Determina la clasificación combinada: si hay una manual (Compró / Pidió
+// presupuesto), esa tiene prioridad. Si no, se infiere automáticamente según
+// hasta qué etapa de mensajes se avanzó: si ya hay algún mensaje de "Segundo
+// contacto" o posterior, el carpintero contestó (si no, no pudo haber
+// avanzado esa etapa). Si solo hay mensajes de "Primer contacto", todavía no
+// sabemos si contestó o no.
+function clasificacionDe(carpintero){
+  const manual = clasificacionManualDe(carpintero);
+  if(manual) return manual;
+
+  const etapa = etapaContactoDe(carpintero);
+  if(etapa === "Sin contacto") return null;
+  if(etapa === "Primer contacto") return CLASIFICACION_AUTO.NO_CONTESTO.id;
+  return CLASIFICACION_AUTO.CONTESTO.id; // Segundo o Tercer contacto ya alcanzados
+}
+
+// Fecha del evento más reciente relevante para calcular "hace cuánto no hay
+// novedades" (cualquier evento cuenta, no solo los manuales).
+function fechaUltimoMovimiento(carpintero){
+  const eventos = carpintero.eventos || [];
+  if(eventos.length > 0) return eventos[0].fecha;
+  return carpintero.fechaAgregado || null;
+}
+
+// Calcula si corresponde mostrar la alerta de "hace mucho sin novedades" para
+// este carpintero, según su clasificación actual y el umbral de días que le
+// corresponde. Devuelve {alerta:boolean, dias:number|null}.
+function alertaSeguimientoDe(carpintero){
+  const clasificacion = clasificacionDe(carpintero);
+  const clave = clasificacion || "sin_contacto";
+  const umbral = DIAS_ALERTA_POR_CLASIFICACION[clave];
+  if(umbral === undefined) return {alerta:false, dias:null}; // "Compró" con id distinto, etc.
+
+  const fecha = fechaUltimoMovimiento(carpintero);
+  if(!fecha) return {alerta:false, dias:null};
+
+  const dias = Math.floor((Date.now() - new Date(fecha).getTime()) / (1000*60*60*24));
+  return {alerta: dias >= umbral, dias};
+}
+
+function labelEvento(tipoId){
+  const t = TIPOS_EVENTO.find(x=>x.id===tipoId)
+    || Object.values(CLASIFICACION_AUTO).find(x=>x.id===tipoId);
+  return t ? t.label : tipoId;
+}
+
 function colorEvento(tipoId){
-  const t = TIPOS_EVENTO.find(x=>x.id===tipoId);
+  const t = TIPOS_EVENTO.find(x=>x.id===tipoId)
+    || Object.values(CLASIFICACION_AUTO).find(x=>x.id===tipoId);
   const color = t ? t.color : "gris";
   const mapa = {
     azul: {bg:"var(--azul-100)", fg:"var(--azul-700)"},
@@ -319,9 +384,10 @@ function separarTelefonos(texto){
 }
 
 function seedInicial(){
+  const ahora = new Date().toISOString();
   const carpinteros = SEED_CARPINTEROS.map(c => {
     const { telefono, ...resto } = c;
-    return {...resto, id: uid("carp"), eventos: [], telefonos: separarTelefonos(telefono)};
+    return {...resto, id: uid("carp"), eventos: [], telefonos: separarTelefonos(telefono), fechaAgregado: ahora};
   });
   return { carpinteros };
 }
@@ -344,6 +410,9 @@ function App(){
   const [modalEventoMasivo, setModalEventoMasivo] = useState(false);
   const [envioMasivoAbierto, setEnvioMasivoAbierto] = useState(false);
   const [carpinteroPrimerContacto, setCarpinteroPrimerContacto] = useState(null);
+  const [carpinteroDetalle, setCarpinteroDetalle] = useState(null);
+  const COLUMNAS_OCULTABLES = ["ruta", "clasificacion", "etapa", "ultimoEvento", "alertas"];
+  const [columnasOcultas, setColumnasOcultas] = useState(()=> new Set());
 
   const mostrarToast = useCallback((msg)=>{ setToast({msg, id:Date.now()}); }, []);
 
@@ -399,6 +468,17 @@ function App(){
           return c;
         });
 
+        // Migración 6: los carpinteros que ya existían antes de este cambio no
+        // tienen "fechaAgregado" (la usamos para calcular la alerta de "Sin
+        // contacto" hace X días). Les asignamos la fecha de este momento, ya
+        // que no tenemos el dato real de cuándo se cargaron originalmente.
+        const ahoraMigracion6 = new Date().toISOString();
+        carpinterosMigrados = carpinterosMigrados.map(c=>{
+          if(c.fechaAgregado) return c;
+          huboMigracion = true;
+          return {...c, fechaAgregado: ahoraMigracion6};
+        });
+
         // Migración 3: sumamos los carpinteros nuevos que están en SEED_CARPINTEROS
         // pero todavía no existen en los datos guardados (comparando por nombre,
         // que es la clave estable entre el seed y lo que ya tenés cargado).
@@ -409,7 +489,7 @@ function App(){
           huboMigracion = true;
           const nuevosCarpinteros = faltantes.map(c => {
             const { telefono, ...resto } = c;
-            return {...resto, id: uid("carp"), eventos: [], telefonos: separarTelefonos(telefono)};
+            return {...resto, id: uid("carp"), eventos: [], telefonos: separarTelefonos(telefono), fechaAgregado: ahoraMigracion6};
           });
           carpinterosMigrados = [...carpinterosMigrados, ...nuevosCarpinteros];
         }
@@ -480,7 +560,7 @@ function App(){
 
   async function guardarCarpintero(carp){
     const existe = db.carpinteros.some(c=>c.id===carp.id);
-    const nuevos = existe ? db.carpinteros.map(c=> c.id===carp.id ? carp : c) : [...db.carpinteros, {...carp, eventos:[]}];
+    const nuevos = existe ? db.carpinteros.map(c=> c.id===carp.id ? carp : c) : [...db.carpinteros, {...carp, eventos:[], fechaAgregado: new Date().toISOString()}];
     await guardarDb({...db, carpinteros: nuevos});
     mostrarToast("Carpintero guardado");
     setModalAbierto(false);
@@ -489,6 +569,15 @@ function App(){
 
   async function actualizarCampoCarpintero(id, campo, valor){
     const nuevos = db.carpinteros.map(c=> c.id===id ? {...c, [campo]: valor} : c);
+    await guardarDb({...db, carpinteros: nuevos});
+  }
+
+  async function marcarSinWhatsapp(carpinteroId, telefonoId, valor){
+    const nuevos = db.carpinteros.map(c=>{
+      if(c.id!==carpinteroId) return c;
+      const telefonos = (c.telefonos||[]).map(t=> t.id===telefonoId ? {...t, sinWhatsapp: valor} : t);
+      return {...c, telefonos};
+    });
     await guardarDb({...db, carpinteros: nuevos});
   }
 
@@ -668,6 +757,7 @@ function App(){
           <select value={filtroClasificacion} onChange={e=>setFiltroClasificacion(e.target.value)} style={{flex:"1 1 140px", padding:"8px 10px", borderRadius:8, border:"1px solid var(--gris-300)", fontSize:13}}>
             <option value="todas">Todas las clasificaciones</option>
             {TIPOS_EVENTO.filter(t=>t.id!=="whatsapp").map(t=> <option key={t.id} value={t.id}>{t.label}</option>)}
+            {Object.values(CLASIFICACION_AUTO).map(t=> <option key={t.id} value={t.id}>{t.label} (auto)</option>)}
           </select>
           <select value={orden} onChange={e=>setOrden(e.target.value)} style={{flex:"1 1 140px", padding:"8px 10px", borderRadius:8, border:"1px solid var(--gris-300)", fontSize:13}}>
             <option value="nombre">Nombre (A-Z)</option>
@@ -694,97 +784,100 @@ function App(){
             {db.carpinteros.length===0 ? "Todavía no cargaste ningún carpintero." : "No hay carpinteros que coincidan con el filtro."}
           </div>
         ) : (
-          <div style={{display:"flex", flexDirection:"column", gap:10}}>
-            {carpinterosFiltrados.map(c=>{
-              const ultimoWhatsapp = (c.eventos||[]).find(e=>e.tipo==="whatsapp");
-              const ultimaClasificacion = (c.eventos||[]).find(e=>e.tipo!=="whatsapp");
-              return (
-              <div key={c.id} style={{background:"#fff", border: modoSeleccion && seleccionados.has(c.id) ? "2px solid var(--azul-500)" : "1px solid var(--gris-100)", borderRadius:12, padding:"14px 16px"}}>
-                <div style={{display:"flex", justifyContent:"space-between", alignItems:"flex-start", gap:10}}>
-                  {modoSeleccion && (
-                    <input type="checkbox" checked={seleccionados.has(c.id)} onChange={()=>alternarSeleccion(c.id)}
-                      style={{width:20, height:20, flexShrink:0, marginTop:2}} />
+          <div style={{overflowX:"auto", border:"1px solid var(--gris-100)", borderRadius:12, background:"#fff"}}>
+            <table style={{width:"100%", borderCollapse:"collapse", fontSize:13}}>
+              <thead>
+                <tr style={{background:"var(--gris-50)", borderBottom:"1px solid var(--gris-100)"}}>
+                  {modoSeleccion && <th style={{padding:"8px 6px", width:30}}></th>}
+                  <th style={{padding:"8px 10px", textAlign:"left", fontWeight:700, whiteSpace:"nowrap"}}>Nombre</th>
+                  <th style={{padding:"8px 10px", textAlign:"left", fontWeight:700, whiteSpace:"nowrap"}}>Localidad</th>
+                  <th style={{padding:"8px 10px", textAlign:"left", fontWeight:700, whiteSpace:"nowrap"}}>Teléfono</th>
+                  {!columnasOcultas.has("ruta") && (
+                    <th style={{padding:"8px 10px", textAlign:"left", fontWeight:700, whiteSpace:"nowrap"}}>
+                      Ruta <button onClick={()=>setColumnasOcultas(prev=>new Set(prev).add("ruta"))} style={{background:"none", border:"none", color:"var(--gris-500)", fontWeight:700, padding:"0 2px", cursor:"pointer"}}>✕</button>
+                    </th>
                   )}
-                  <div style={{flex:1, minWidth:0}}>
-                    <div style={{fontWeight:700, fontSize:15}}>{c.nombre}</div>
-                    <div style={{fontSize:12.5, color:"var(--gris-500)", marginTop:3}}>
-                      {c.localidad && <span>{c.localidad}{c.provincia ? ", "+c.provincia : ""}</span>}
-                    </div>
-                    {c.ruta && (
-                      <span style={{display:"inline-block", fontSize:10.5, padding:"2px 8px", borderRadius:20, background:"var(--azul-100)", color:"var(--azul-700)", fontWeight:600, marginTop:5}}>
-                        🛣️ {c.ruta}
-                      </span>
-                    )}
-                    {c.domicilio && <div style={{fontSize:12, color:"var(--gris-500)", marginTop:4}}>{c.domicilio}</div>}
-                    {(c.telefonos||[]).map(t=>(
-                      <div key={t.id} style={{marginTop:4}}>
-                        <a href={`https://wa.me/54${t.numero.replace(/[^0-9]/g,"")}`} target="_blank" rel="noopener"
-                          style={{fontSize:12.5, color:"var(--verde-600)", textDecoration:"none", display:"inline-block", fontWeight:600}}>
-                          📱 {t.nombre ? `${t.nombre} — ${t.numero}` : t.numero}
-                        </a>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {ultimoWhatsapp && (
-                  <div style={{marginTop:8}}>
-                    <div style={{display:"flex", alignItems:"center", gap:6, flexWrap:"wrap"}}>
-                      <span style={{fontSize:10.5, padding:"2px 8px", borderRadius:20, fontWeight:700,
-                        background: colorEvento(ultimoWhatsapp.tipo).bg, color: colorEvento(ultimoWhatsapp.tipo).fg}}>
-                        {TIPOS_EVENTO.find(t=>t.id===ultimoWhatsapp.tipo)?.label || ultimoWhatsapp.tipo}
-                      </span>
-                      <span style={{fontSize:11.5, color:"var(--gris-500)"}}>{fmtFechaCorta(ultimoWhatsapp.fecha)}</span>
-                    </div>
-                    {ultimoWhatsapp.comentario && (
-                      <div style={{fontSize:12, color:"var(--gris-600)", marginTop:3, fontStyle:"italic"}}>
-                        "{ultimoWhatsapp.comentario}"
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {ultimaClasificacion && (
-                  <div style={{marginTop:6}}>
-                    <div style={{display:"flex", alignItems:"center", gap:6, flexWrap:"wrap"}}>
-                      <span style={{fontSize:10.5, padding:"2px 8px", borderRadius:20, fontWeight:700,
-                        background: colorEvento(ultimaClasificacion.tipo).bg, color: colorEvento(ultimaClasificacion.tipo).fg}}>
-                        {TIPOS_EVENTO.find(t=>t.id===ultimaClasificacion.tipo)?.label || ultimaClasificacion.tipo}
-                      </span>
-                      <span style={{fontSize:11.5, color:"var(--gris-500)"}}>{fmtFechaCorta(ultimaClasificacion.fecha)}</span>
-                    </div>
-                    {ultimaClasificacion.comentario && (
-                      <div style={{fontSize:12, color:"var(--gris-600)", marginTop:3, fontStyle:"italic"}}>
-                        "{ultimaClasificacion.comentario}"
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                <div style={{display:"flex", gap:6, marginTop:10, paddingTop:10, borderTop:"1px solid var(--gris-100)", flexWrap:"wrap"}}>
-                  {TIPOS_EVENTO.filter(t=>t.id!=="whatsapp").map(t=>(
-                    <button key={t.id} onClick={()=>agregarEvento(c.id, {id: uid("ev"), fecha: new Date().toISOString(), tipo: t.id, comentario:""})}
-                      style={{fontSize:11.5, padding:"4px 9px", borderRadius:20, border:"none", fontWeight:600,
-                        background: colorEvento(t.id).bg, color: colorEvento(t.id).fg}}>
-                      {t.label}
-                    </button>
-                  ))}
-                </div>
-
-                <div style={{display:"flex", gap:16, marginTop:8, paddingTop:8, alignItems:"center", flexWrap:"wrap"}}>
-                  {(c.telefonos||[]).length>0 && (
-                    <button onClick={()=>setCarpinteroPrimerContacto(c)} style={{fontSize:13, color:"var(--verde-700)", background:"none", border:"none", padding:0, fontWeight:600}}>
-                      💬 Primer contacto
-                    </button>
+                  {!columnasOcultas.has("clasificacion") && (
+                    <th style={{padding:"8px 10px", textAlign:"left", fontWeight:700, whiteSpace:"nowrap"}}>
+                      Clasificación <button onClick={()=>setColumnasOcultas(prev=>new Set(prev).add("clasificacion"))} style={{background:"none", border:"none", color:"var(--gris-500)", fontWeight:700, padding:"0 2px", cursor:"pointer"}}>✕</button>
+                    </th>
                   )}
-                  <button onClick={()=>setCarpinteroEventos(c)} style={{fontSize:13, color:"var(--verde-600)", background:"none", border:"none", padding:0, fontWeight:600}}>
-                    Seguimiento {(c.eventos||[]).length>0 && `(${(c.eventos||[]).length})`}
-                  </button>
-                  <button onClick={()=>{setEditando(c); setModalAbierto(true);}} style={{fontSize:13, color:"var(--azul-600)", background:"none", border:"none", padding:0}}>Editar</button>
-                  <button onClick={()=>eliminarCarpintero(c.id)} style={{fontSize:13, color:"var(--rojo-600)", background:"none", border:"none", padding:0}}>Eliminar</button>
-                </div>
+                  {!columnasOcultas.has("etapa") && (
+                    <th style={{padding:"8px 10px", textAlign:"left", fontWeight:700, whiteSpace:"nowrap"}}>
+                      Etapa <button onClick={()=>setColumnasOcultas(prev=>new Set(prev).add("etapa"))} style={{background:"none", border:"none", color:"var(--gris-500)", fontWeight:700, padding:"0 2px", cursor:"pointer"}}>✕</button>
+                    </th>
+                  )}
+                  {!columnasOcultas.has("ultimoEvento") && (
+                    <th style={{padding:"8px 10px", textAlign:"left", fontWeight:700, whiteSpace:"nowrap"}}>
+                      Último evento <button onClick={()=>setColumnasOcultas(prev=>new Set(prev).add("ultimoEvento"))} style={{background:"none", border:"none", color:"var(--gris-500)", fontWeight:700, padding:"0 2px", cursor:"pointer"}}>✕</button>
+                    </th>
+                  )}
+                  {!columnasOcultas.has("alertas") && (
+                    <th style={{padding:"8px 10px", textAlign:"left", fontWeight:700, whiteSpace:"nowrap"}}>
+                      Alertas <button onClick={()=>setColumnasOcultas(prev=>new Set(prev).add("alertas"))} style={{background:"none", border:"none", color:"var(--gris-500)", fontWeight:700, padding:"0 2px", cursor:"pointer"}}>✕</button>
+                    </th>
+                  )}
+                </tr>
+              </thead>
+              <tbody>
+                {carpinterosFiltrados.map(c=>{
+                  const clasificacionManual = (c.eventos||[]).find(e=>e.tipo!=="whatsapp");
+                  const clasificacionAutoId = !clasificacionManual ? clasificacionDe(c) : null;
+                  const clasificacionAuto = clasificacionAutoId ? Object.values(CLASIFICACION_AUTO).find(x=>x.id===clasificacionAutoId) : null;
+                  const etiquetaClasificacion = clasificacionManual ? labelEvento(clasificacionManual.tipo) : (clasificacionAuto ? clasificacionAuto.label+" (auto)" : "—");
+                  const colorClasificacion = clasificacionManual ? colorEvento(clasificacionManual.tipo) : (clasificacionAuto ? colorEvento(clasificacionAuto.id) : null);
+                  const etapa = etapaContactoDe(c);
+                  const ultimoEvento = (c.eventos||[])[0];
+                  const {alerta, dias} = alertaSeguimientoDe(c);
+                  const primerTel = (c.telefonos||[])[0];
+                  return (
+                    <tr key={c.id} onClick={()=>setCarpinteroDetalle(c)}
+                      style={{borderBottom:"1px solid var(--gris-100)", cursor:"pointer",
+                        background: modoSeleccion && seleccionados.has(c.id) ? "var(--azul-50)" : "transparent"}}>
+                      {modoSeleccion && (
+                        <td style={{padding:"8px 6px"}} onClick={e=>e.stopPropagation()}>
+                          <input type="checkbox" checked={seleccionados.has(c.id)} onChange={()=>alternarSeleccion(c.id)} style={{width:18, height:18}} />
+                        </td>
+                      )}
+                      <td style={{padding:"8px 10px", fontWeight:600, whiteSpace:"nowrap"}}>{c.nombre}</td>
+                      <td style={{padding:"8px 10px", color:"var(--gris-600)", whiteSpace:"nowrap"}}>{c.localidad || "—"}</td>
+                      <td style={{padding:"8px 10px", whiteSpace:"nowrap"}}>
+                        {primerTel ? (primerTel.sinWhatsapp ? `📵 ${primerTel.numero}` : primerTel.numero) : "—"}
+                      </td>
+                      {!columnasOcultas.has("ruta") && <td style={{padding:"8px 10px", color:"var(--gris-600)", whiteSpace:"nowrap"}}>{c.ruta || "—"}</td>}
+                      {!columnasOcultas.has("clasificacion") && (
+                        <td style={{padding:"8px 10px", whiteSpace:"nowrap"}}>
+                          {colorClasificacion ? (
+                            <span style={{fontSize:10.5, padding:"2px 8px", borderRadius:20, fontWeight:700, background:colorClasificacion.bg, color:colorClasificacion.fg}}>
+                              {etiquetaClasificacion}
+                            </span>
+                          ) : "—"}
+                        </td>
+                      )}
+                      {!columnasOcultas.has("etapa") && <td style={{padding:"8px 10px", color:"var(--gris-600)", whiteSpace:"nowrap"}}>{etapa}</td>}
+                      {!columnasOcultas.has("ultimoEvento") && (
+                        <td style={{padding:"8px 10px", color:"var(--gris-600)", whiteSpace:"nowrap"}}>
+                          {ultimoEvento ? fmtFechaCorta(ultimoEvento.fecha) : "—"}
+                        </td>
+                      )}
+                      {!columnasOcultas.has("alertas") && (
+                        <td style={{padding:"8px 10px", whiteSpace:"nowrap"}}>
+                          {alerta ? <span style={{color:"var(--rojo-600)", fontWeight:700, fontSize:12}}>⏰ {dias}d</span> : "—"}
+                        </td>
+                      )}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+            {columnasOcultas.size > 0 && (
+              <div style={{padding:"10px", borderTop:"1px solid var(--gris-100)"}}>
+                <button onClick={()=>setColumnasOcultas(new Set())}
+                  style={{fontSize:12.5, color:"var(--azul-600)", background:"none", border:"1px dashed var(--azul-500)", borderRadius:7, padding:"6px 12px"}}>
+                  + Agregar columna ({columnasOcultas.size} oculta{columnasOcultas.size>1?"s":""})
+                </button>
               </div>
-            );})}
+            )}
           </div>
         )}
       </main>
@@ -845,11 +938,144 @@ function App(){
         />
       )}
 
+      {carpinteroDetalle && (
+        <ModalDetalleCarpintero
+          carpintero={db.carpinteros.find(c=>c.id===carpinteroDetalle.id) || carpinteroDetalle}
+          onCerrar={()=>setCarpinteroDetalle(null)}
+          onAgregarEvento={agregarEvento}
+          onMarcarSinWhatsapp={marcarSinWhatsapp}
+          onAbrirPrimerContacto={(c)=>{setCarpinteroDetalle(null); setCarpinteroPrimerContacto(c);}}
+          onAbrirSeguimiento={(c)=>{setCarpinteroDetalle(null); setCarpinteroEventos(c);}}
+          onEditar={(c)=>{setCarpinteroDetalle(null); setEditando(c); setModalAbierto(true);}}
+          onEliminar={(id)=>{setCarpinteroDetalle(null); eliminarCarpintero(id);}}
+        />
+      )}
+
       {toast && (
         <div style={{position:"fixed", bottom:24, left:"50%", transform:"translateX(-50%)", background:"var(--verde-600)", color:"#fff", padding:"11px 20px", borderRadius:10, boxShadow:"0 8px 24px rgba(0,0,0,0.2)", fontSize:14, zIndex:100}}>
           {toast.msg}
         </div>
       )}
+    </div>
+  );
+}
+
+function ModalDetalleCarpintero({carpintero, onCerrar, onAgregarEvento, onMarcarSinWhatsapp, onAbrirPrimerContacto, onAbrirSeguimiento, onEditar, onEliminar}){
+  const c = carpintero;
+  const clasificacionManual = (c.eventos||[]).find(e=>e.tipo!=="whatsapp");
+  const clasificacionAutoId = !clasificacionManual ? clasificacionDe(c) : null;
+  const clasificacionAuto = clasificacionAutoId ? Object.values(CLASIFICACION_AUTO).find(x=>x.id===clasificacionAutoId) : null;
+  const ultimoWhatsapp = (c.eventos||[]).find(e=>e.tipo==="whatsapp");
+  const {alerta, dias} = alertaSeguimientoDe(c);
+
+  return (
+    <div className="modal-overlay" style={{position:"fixed", inset:0, background:"rgba(10,20,35,0.5)", display:"flex", alignItems:"center", justifyContent:"center", zIndex:65, padding:16}} onClick={onCerrar}>
+      <div className="modal-box" style={{background:"#fff", borderRadius:14, padding:"20px 18px", width:460, maxWidth:"100%", maxHeight:"90vh", overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
+        <div style={{fontWeight:700, fontSize:16}}>{c.nombre}</div>
+        <div style={{fontSize:12.5, color:"var(--gris-500)", marginTop:3}}>
+          {c.localidad && <span>{c.localidad}{c.provincia ? ", "+c.provincia : ""}</span>}
+        </div>
+        {c.ruta && (
+          <span style={{display:"inline-block", fontSize:10.5, padding:"2px 8px", borderRadius:20, background:"var(--azul-100)", color:"var(--azul-700)", fontWeight:600, marginTop:5}}>
+            🛣️ {c.ruta}
+          </span>
+        )}
+        {c.domicilio && <div style={{fontSize:12, color:"var(--gris-500)", marginTop:4}}>{c.domicilio}</div>}
+        {(c.telefonos||[]).map(t=>(
+          <div key={t.id} style={{marginTop:4, display:"flex", alignItems:"center", gap:6}}>
+            {t.sinWhatsapp ? (
+              <span style={{fontSize:12.5, color:"var(--gris-500)"}}>
+                📵 {t.nombre ? `${t.nombre} — ${t.numero}` : t.numero} (sin WhatsApp)
+              </span>
+            ) : (
+              <a href={`https://wa.me/54${t.numero.replace(/[^0-9]/g,"")}`} target="_blank" rel="noopener"
+                style={{fontSize:12.5, color:"var(--verde-600)", textDecoration:"none", display:"inline-block", fontWeight:600}}>
+                📱 {t.nombre ? `${t.nombre} — ${t.numero}` : t.numero}
+              </a>
+            )}
+            <button onClick={()=>onMarcarSinWhatsapp(c.id, t.id, !t.sinWhatsapp)}
+              style={{fontSize:10, color:"var(--gris-500)", background:"none", border:"none", padding:0, textDecoration:"underline"}}>
+              {t.sinWhatsapp ? "deshacer" : "sin WhatsApp"}
+            </button>
+          </div>
+        ))}
+
+        {alerta && (
+          <div style={{marginTop:8, fontSize:11.5, color:"var(--rojo-600)", fontWeight:700, display:"flex", alignItems:"center", gap:4}}>
+            ⏰ hace {dias} días sin novedades
+          </div>
+        )}
+
+        {ultimoWhatsapp && (
+          <div style={{marginTop:8}}>
+            <div style={{display:"flex", alignItems:"center", gap:6, flexWrap:"wrap"}}>
+              <span style={{fontSize:10.5, padding:"2px 8px", borderRadius:20, fontWeight:700,
+                background: colorEvento(ultimoWhatsapp.tipo).bg, color: colorEvento(ultimoWhatsapp.tipo).fg}}>
+                {labelEvento(ultimoWhatsapp.tipo)}
+              </span>
+              <span style={{fontSize:11.5, color:"var(--gris-500)"}}>{fmtFechaCorta(ultimoWhatsapp.fecha)}</span>
+            </div>
+            {ultimoWhatsapp.comentario && (
+              <div style={{fontSize:12, color:"var(--gris-600)", marginTop:3, fontStyle:"italic"}}>
+                "{ultimoWhatsapp.comentario}"
+              </div>
+            )}
+          </div>
+        )}
+
+        {clasificacionManual && (
+          <div style={{marginTop:6}}>
+            <div style={{display:"flex", alignItems:"center", gap:6, flexWrap:"wrap"}}>
+              <span style={{fontSize:10.5, padding:"2px 8px", borderRadius:20, fontWeight:700,
+                background: colorEvento(clasificacionManual.tipo).bg, color: colorEvento(clasificacionManual.tipo).fg}}>
+                {labelEvento(clasificacionManual.tipo)}
+              </span>
+              <span style={{fontSize:11.5, color:"var(--gris-500)"}}>{fmtFechaCorta(clasificacionManual.fecha)}</span>
+            </div>
+            {clasificacionManual.comentario && (
+              <div style={{fontSize:12, color:"var(--gris-600)", marginTop:3, fontStyle:"italic"}}>
+                "{clasificacionManual.comentario}"
+              </div>
+            )}
+          </div>
+        )}
+
+        {!clasificacionManual && clasificacionAuto && (
+          <div style={{marginTop:6}}>
+            <span style={{fontSize:10.5, padding:"2px 8px", borderRadius:20, fontWeight:700,
+              background: colorEvento(clasificacionAuto.id).bg, color: colorEvento(clasificacionAuto.id).fg}}>
+              {clasificacionAuto.label} (auto)
+            </span>
+          </div>
+        )}
+
+        <div style={{display:"flex", gap:6, marginTop:10, paddingTop:10, borderTop:"1px solid var(--gris-100)", flexWrap:"wrap"}}>
+          {TIPOS_EVENTO.filter(t=>t.id!=="whatsapp").map(t=>(
+            <button key={t.id} onClick={()=>onAgregarEvento(c.id, {id: uid("ev"), fecha: new Date().toISOString(), tipo: t.id, comentario:""})}
+              style={{fontSize:11.5, padding:"4px 9px", borderRadius:20, border:"none", fontWeight:600,
+                background: colorEvento(t.id).bg, color: colorEvento(t.id).fg}}>
+              {t.label}
+            </button>
+          ))}
+        </div>
+
+        <div style={{display:"flex", gap:16, marginTop:12, paddingTop:8, alignItems:"center", flexWrap:"wrap"}}>
+          {(c.telefonos||[]).length>0 && (
+            <button onClick={()=>onAbrirPrimerContacto(c)} style={{fontSize:13, color:"var(--verde-700)", background:"none", border:"none", padding:0, fontWeight:600}}>
+              💬 Primer contacto
+            </button>
+          )}
+          <button onClick={()=>onAbrirSeguimiento(c)} style={{fontSize:13, color:"var(--verde-600)", background:"none", border:"none", padding:0, fontWeight:600}}>
+            Seguimiento {(c.eventos||[]).length>0 && `(${(c.eventos||[]).length})`}
+          </button>
+          <button onClick={()=>onEditar(c)} style={{fontSize:13, color:"var(--azul-600)", background:"none", border:"none", padding:0}}>Editar</button>
+          <button onClick={()=>onEliminar(c.id)} style={{fontSize:13, color:"var(--rojo-600)", background:"none", border:"none", padding:0}}>Eliminar</button>
+        </div>
+
+        <div style={{marginTop:16}}>
+          <button onClick={onCerrar} style={{width:"100%", padding:"10px", borderRadius:8, border:"1px solid var(--gris-300)", background:"#fff"}}>Cerrar</button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -1004,7 +1230,7 @@ function ModalEventos({carpintero, onAgregar, onEliminar, onCerrar, comentariosP
                   <div style={{flex:1, minWidth:0}}>
                     <span style={{fontSize:11, padding:"2px 8px", borderRadius:20, fontWeight:700,
                       background: colorEvento(ev.tipo).bg, color: colorEvento(ev.tipo).fg}}>
-                      {TIPOS_EVENTO.find(t=>t.id===ev.tipo)?.label || ev.tipo}
+                      {labelEvento(ev.tipo)}
                     </span>
                     <div style={{fontSize:11.5, color:"var(--gris-500)", marginTop:4}}>{fmtFechaCompleta(ev.fecha)}</div>
                     {ev.comentario && <div style={{fontSize:13, color:"var(--gris-700)", marginTop:4}}>{ev.comentario}</div>}
