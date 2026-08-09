@@ -688,6 +688,18 @@ function App(){
     return lista;
   }, [db, busqueda, filtroLocalidad, filtroRuta, filtroEtapaContacto, filtroClasificacion, orden]);
 
+  // Métricas simples sobre lo que está filtrado en este momento: cuenta cada
+  // carpintero según su clasificación actual (manual o automática).
+  const metricas = useMemo(()=>{
+    const contadores = {compro:0, pidio_presupuesto:0, contesto_auto:0, no_contesto_auto:0, sin_contacto:0};
+    carpinterosFiltrados.forEach(c=>{
+      const clasificacion = clasificacionDe(c);
+      const clave = clasificacion || "sin_contacto";
+      if(contadores[clave] !== undefined) contadores[clave]++;
+    });
+    return contadores;
+  }, [carpinterosFiltrados]);
+
   if(cargando || !db){
     return (
       <div style={{display:"flex", alignItems:"center", justifyContent:"center", height:"100vh", flexDirection:"column", gap:12}}>
@@ -778,6 +790,24 @@ function App(){
             </button>
           </div>
         )}
+
+        <div style={{display:"flex", gap:8, marginBottom:14, flexWrap:"wrap"}}>
+          <span style={{fontSize:11.5, padding:"5px 10px", borderRadius:20, background:"var(--verde-100)", color:"var(--verde-600)", fontWeight:700, whiteSpace:"nowrap"}}>
+            {metricas.compro} compraron
+          </span>
+          <span style={{fontSize:11.5, padding:"5px 10px", borderRadius:20, background:"var(--azul-100)", color:"var(--azul-700)", fontWeight:700, whiteSpace:"nowrap"}}>
+            {metricas.pidio_presupuesto} pidieron presupuesto
+          </span>
+          <span style={{fontSize:11.5, padding:"5px 10px", borderRadius:20, background:"var(--azul-100)", color:"var(--azul-700)", fontWeight:700, whiteSpace:"nowrap"}}>
+            {metricas.contesto_auto} contestaron
+          </span>
+          <span style={{fontSize:11.5, padding:"5px 10px", borderRadius:20, background:"var(--ambar-100)", color:"var(--ambar-600)", fontWeight:700, whiteSpace:"nowrap"}}>
+            {metricas.no_contesto_auto} no contestaron
+          </span>
+          <span style={{fontSize:11.5, padding:"5px 10px", borderRadius:20, background:"var(--gris-100)", color:"var(--gris-500)", fontWeight:700, whiteSpace:"nowrap"}}>
+            {metricas.sin_contacto} sin contacto
+          </span>
+        </div>
 
         {carpinterosFiltrados.length===0 ? (
           <div style={{textAlign:"center", padding:"40px 20px", color:"var(--gris-500)", fontSize:14}}>
