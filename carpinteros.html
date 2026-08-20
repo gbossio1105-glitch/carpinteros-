@@ -352,6 +352,45 @@ function colorEvento(tipoId){
 // teléfonos [{id, nombre, numero}]. Reconstruye "código de área + número local"
 // cuando detecta un grupo corto (el área) seguido de uno o más números cortos
 // que la comparten.
+// Normaliza un handle o link de Instagram (ej "@negocio" o "negocio" o una URL
+// completa) al link https://instagram.com/negocio para abrir directo.
+function urlInstagram(valor){
+  if(!valor) return "#";
+  const v = valor.trim();
+  if(v.startsWith("http")) return v;
+  const handle = v.replace(/^@/, "");
+  return `https://instagram.com/${handle}`;
+}
+
+// Normaliza un valor de Facebook: si ya es una URL completa la usa tal cual,
+// si es "facebook.com/pagina" le agrega el https://, y si es solo el nombre
+// de la página arma el link directo.
+function urlFacebook(valor){
+  if(!valor) return "#";
+  const v = valor.trim();
+  if(v.startsWith("http")) return v;
+  if(v.startsWith("facebook.com") || v.startsWith("www.facebook.com")) return `https://${v}`;
+  return `https://facebook.com/${v}`;
+}
+
+function IconoInstagram({size=18}){
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <rect x="2" y="2" width="20" height="20" rx="5" stroke="currentColor" strokeWidth="2"/>
+      <circle cx="12" cy="12" r="4.2" stroke="currentColor" strokeWidth="2"/>
+      <circle cx="17.3" cy="6.7" r="1.2" fill="currentColor"/>
+    </svg>
+  );
+}
+
+function IconoFacebook({size=18}){
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M15 8.5h2V5.3c-.35-.05-1.54-.15-2.93-.15-2.9 0-4.88 1.77-4.88 5.02V13H6.5v3.5h2.69V23h3.6v-6.5h2.58l.41-3.5h-2.99V10.6c0-1.01.28-1.7 1.72-1.7z" fill="currentColor"/>
+    </svg>
+  );
+}
+
 function separarTelefonos(texto){
   if(!texto || !texto.trim()) return [];
   const grupos = texto.match(/\d+/g) || [];
@@ -482,15 +521,9 @@ function App(){
         // Migración 3: sumamos los carpinteros nuevos que están en SEED_CARPINTEROS
         // pero todavía no existen en los datos guardados (comparando por nombre,
         // que es la clave estable entre el seed y lo que ya tenés cargado).
-        // No toca ni reemplaza a los que ya existen, y respeta la lista de
-        // "nombresEliminados" para no revivir carpinteros que se borraron
-        // intencionalmente desde la app.
+        // No toca ni reemplaza a los que ya existen.
         const nombresExistentes = new Set(carpinterosMigrados.map(c => (c.nombre||"").trim().toUpperCase()));
-        const nombresEliminadosSet = new Set((data.nombresEliminados||[]).map(n=>n.trim().toUpperCase()));
-        const faltantes = SEED_CARPINTEROS.filter(c => {
-          const nombreNorm = (c.nombre||"").trim().toUpperCase();
-          return !nombresExistentes.has(nombreNorm) && !nombresEliminadosSet.has(nombreNorm);
-        });
+        const faltantes = SEED_CARPINTEROS.filter(c => !nombresExistentes.has((c.nombre||"").trim().toUpperCase()));
         if(faltantes.length > 0){
           huboMigracion = true;
           const nuevosCarpinteros = faltantes.map(c => {
@@ -589,15 +622,7 @@ function App(){
 
   async function eliminarCarpintero(id){
     if(!confirm("¿Eliminar este carpintero?")) return;
-    const carpintero = db.carpinteros.find(c=>c.id===id);
-    const nombreEliminado = (carpintero?.nombre||"").trim().toUpperCase();
-    const nombresEliminados = new Set(db.nombresEliminados||[]);
-    if(nombreEliminado) nombresEliminados.add(nombreEliminado);
-    await guardarDb({
-      ...db,
-      carpinteros: db.carpinteros.filter(c=>c.id!==id),
-      nombresEliminados: [...nombresEliminados],
-    });
+    await guardarDb({...db, carpinteros: db.carpinteros.filter(c=>c.id!==id)});
     mostrarToast("Carpintero eliminado");
   }
 
@@ -702,23 +727,14 @@ function App(){
     return lista;
   }, [db, busqueda, filtroLocalidad, filtroRuta, filtroEtapaContacto, filtroClasificacion, orden]);
 
-  // Cantidades para mostrar junto a cada opción de los filtros de "Etapa de
-  // contacto" y "Clasificación", calculadas sobre lo que está filtrado en
-  // este momento (respetando los demás filtros ya aplicados).
-  const conteoEtapas = useMemo(()=>{
-    const contadores = {"Sin contacto":0, "Primer contacto":0, "Segundo contacto":0, "Tercer contacto":0};
-    carpinterosFiltrados.forEach(c=>{
-      const etapa = etapaContactoDe(c);
-      if(contadores[etapa] !== undefined) contadores[etapa]++;
-    });
-    return contadores;
-  }, [carpinterosFiltrados]);
-
-  const conteoClasificaciones = useMemo(()=>{
-    const contadores = {compro:0, pidio_presupuesto:0, contesto_auto:0, no_contesto_auto:0};
+  // Métricas simples sobre lo que está filtrado en este momento: cuenta cada
+  // carpintero según su clasificación actual (manual o automática).
+  const metricas = useMemo(()=>{
+    const contadores = {compro:0, pidio_presupuesto:0, contesto_auto:0, no_contesto_auto:0, sin_contacto:0};
     carpinterosFiltrados.forEach(c=>{
       const clasificacion = clasificacionDe(c);
-      if(clasificacion && contadores[clasificacion] !== undefined) contadores[clasificacion]++;
+      const clave = clasificacion || "sin_contacto";
+      if(contadores[clave] !== undefined) contadores[clave]++;
     });
     return contadores;
   }, [carpinterosFiltrados]);
@@ -784,15 +800,15 @@ function App(){
           </select>
           <select value={filtroEtapaContacto} onChange={e=>setFiltroEtapaContacto(e.target.value)} style={{flex:"1 1 140px", padding:"8px 10px", borderRadius:8, border:"1px solid var(--gris-300)", fontSize:13}}>
             <option value="todas">Todos los contactos</option>
-            <option value="Sin contacto">Sin contacto ({conteoEtapas["Sin contacto"]})</option>
-            <option value="Primer contacto">Primer contacto ({conteoEtapas["Primer contacto"]})</option>
-            <option value="Segundo contacto">Segundo contacto ({conteoEtapas["Segundo contacto"]})</option>
-            <option value="Tercer contacto">Tercer contacto ({conteoEtapas["Tercer contacto"]})</option>
+            <option value="Sin contacto">Sin contacto</option>
+            <option value="Primer contacto">Primer contacto</option>
+            <option value="Segundo contacto">Segundo contacto</option>
+            <option value="Tercer contacto">Tercer contacto</option>
           </select>
           <select value={filtroClasificacion} onChange={e=>setFiltroClasificacion(e.target.value)} style={{flex:"1 1 140px", padding:"8px 10px", borderRadius:8, border:"1px solid var(--gris-300)", fontSize:13}}>
             <option value="todas">Todas las clasificaciones</option>
-            {TIPOS_EVENTO.filter(t=>t.id!=="whatsapp").map(t=> <option key={t.id} value={t.id}>{t.label} ({conteoClasificaciones[t.id]||0})</option>)}
-            {Object.values(CLASIFICACION_AUTO).map(t=> <option key={t.id} value={t.id}>{t.label} (auto) ({conteoClasificaciones[t.id]||0})</option>)}
+            {TIPOS_EVENTO.filter(t=>t.id!=="whatsapp").map(t=> <option key={t.id} value={t.id}>{t.label}</option>)}
+            {Object.values(CLASIFICACION_AUTO).map(t=> <option key={t.id} value={t.id}>{t.label} (auto)</option>)}
           </select>
           <select value={orden} onChange={e=>setOrden(e.target.value)} style={{flex:"1 1 140px", padding:"8px 10px", borderRadius:8, border:"1px solid var(--gris-300)", fontSize:13}}>
             <option value="nombre">Nombre (A-Z)</option>
@@ -813,6 +829,24 @@ function App(){
             </button>
           </div>
         )}
+
+        <div style={{display:"flex", gap:8, marginBottom:14, flexWrap:"wrap"}}>
+          <span style={{fontSize:11.5, padding:"5px 10px", borderRadius:20, background:"var(--verde-100)", color:"var(--verde-600)", fontWeight:700, whiteSpace:"nowrap"}}>
+            {metricas.compro} compraron
+          </span>
+          <span style={{fontSize:11.5, padding:"5px 10px", borderRadius:20, background:"var(--azul-100)", color:"var(--azul-700)", fontWeight:700, whiteSpace:"nowrap"}}>
+            {metricas.pidio_presupuesto} pidieron presupuesto
+          </span>
+          <span style={{fontSize:11.5, padding:"5px 10px", borderRadius:20, background:"var(--azul-100)", color:"var(--azul-700)", fontWeight:700, whiteSpace:"nowrap"}}>
+            {metricas.contesto_auto} contestaron
+          </span>
+          <span style={{fontSize:11.5, padding:"5px 10px", borderRadius:20, background:"var(--ambar-100)", color:"var(--ambar-600)", fontWeight:700, whiteSpace:"nowrap"}}>
+            {metricas.no_contesto_auto} no contestaron
+          </span>
+          <span style={{fontSize:11.5, padding:"5px 10px", borderRadius:20, background:"var(--gris-100)", color:"var(--gris-500)", fontWeight:700, whiteSpace:"nowrap"}}>
+            {metricas.sin_contacto} sin contacto
+          </span>
+        </div>
 
         {carpinterosFiltrados.length===0 ? (
           <div style={{textAlign:"center", padding:"40px 20px", color:"var(--gris-500)", fontSize:14}}>
@@ -874,7 +908,23 @@ function App(){
                           <input type="checkbox" checked={seleccionados.has(c.id)} onChange={()=>alternarSeleccion(c.id)} style={{width:18, height:18}} />
                         </td>
                       )}
-                      <td style={{padding:"8px 10px", fontWeight:600, whiteSpace:"nowrap"}}>{c.nombre}</td>
+                      <td style={{padding:"8px 10px", fontWeight:600, whiteSpace:"nowrap"}}>
+                        <span style={{display:"inline-flex", alignItems:"center", gap:6}}>
+                          {c.nombre}
+                          {c.redes && c.redes.instagram && (
+                            <a href={urlInstagram(c.redes.instagram)} target="_blank" rel="noopener" title={"Instagram: "+c.redes.instagram}
+                              onClick={e=>e.stopPropagation()} style={{color:"#C13584", display:"inline-flex"}}>
+                              <IconoInstagram size={14}/>
+                            </a>
+                          )}
+                          {c.redes && c.redes.facebook && (
+                            <a href={urlFacebook(c.redes.facebook)} target="_blank" rel="noopener" title={"Facebook: "+c.redes.facebook}
+                              onClick={e=>e.stopPropagation()} style={{color:"#1877F2", display:"inline-flex"}}>
+                              <IconoFacebook size={14}/>
+                            </a>
+                          )}
+                        </span>
+                      </td>
                       <td style={{padding:"8px 10px", color:"var(--gris-600)", whiteSpace:"nowrap"}}>{c.localidad || "—"}</td>
                       <td style={{padding:"8px 10px", whiteSpace:"nowrap"}}>
                         {primerTel ? (primerTel.sinWhatsapp ? `📵 ${primerTel.numero}` : primerTel.numero) : "—"}
@@ -1035,6 +1085,25 @@ function ModalDetalleCarpintero({carpintero, onCerrar, onAgregarEvento, onMarcar
           </div>
         ))}
 
+        {(c.redes && (c.redes.instagram || c.redes.facebook)) && (
+          <div style={{marginTop:8, display:"flex", gap:14, alignItems:"center"}}>
+            {c.redes.instagram && (
+              <a href={urlInstagram(c.redes.instagram)} target="_blank" rel="noopener"
+                title={c.redes.instagram}
+                style={{display:"inline-flex", alignItems:"center", gap:5, fontSize:12.5, color:"#C13584", textDecoration:"none", fontWeight:600}}>
+                <IconoInstagram size={18}/> Instagram
+              </a>
+            )}
+            {c.redes.facebook && (
+              <a href={urlFacebook(c.redes.facebook)} target="_blank" rel="noopener"
+                title={c.redes.facebook}
+                style={{display:"inline-flex", alignItems:"center", gap:5, fontSize:12.5, color:"#1877F2", textDecoration:"none", fontWeight:600}}>
+                <IconoFacebook size={18}/> Facebook
+              </a>
+            )}
+          </div>
+        )}
+
         {alerta && (
           <div style={{marginTop:8, fontSize:11.5, color:"var(--rojo-600)", fontWeight:700, display:"flex", alignItems:"center", gap:4}}>
             ⏰ hace {dias} días sin novedades
@@ -1117,10 +1186,14 @@ function ModalDetalleCarpintero({carpintero, onCerrar, onAgregarEvento, onMarcar
 
 function ModalCarpintero({carpintero, onGuardar, onCerrar}){
   const [form, setForm] = useState(carpintero || {
-    id: uid("carp"), nombre:"", domicilio:"", localidad:"", provincia:"", telefonos:[], ruta:""
+    id: uid("carp"), nombre:"", domicilio:"", localidad:"", provincia:"", telefonos:[], ruta:"", redes:{instagram:"", facebook:""}
   });
 
   function actualizar(campo, valor){ setForm(f=>({...f, [campo]: valor})); }
+
+  function actualizarRed(campo, valor){
+    setForm(f=>({...f, redes: {...(f.redes||{}), [campo]: valor}}));
+  }
 
   function actualizarTelefono(id, campo, valor){
     setForm(f=>({...f, telefonos: (f.telefonos||[]).map(t=> t.id===id ? {...t, [campo]:valor} : t)}));
@@ -1178,6 +1251,17 @@ function ModalCarpintero({carpintero, onGuardar, onCerrar}){
             + Agregar teléfono
           </button>
         </Campo>
+
+        <div className="fila-campos" style={{display:"flex", gap:12}}>
+          <Campo label="Instagram">
+            <input value={(form.redes&&form.redes.instagram)||""} onChange={e=>actualizarRed("instagram", e.target.value)}
+              style={inputStyle} placeholder="@usuario" />
+          </Campo>
+          <Campo label="Facebook">
+            <input value={(form.redes&&form.redes.facebook)||""} onChange={e=>actualizarRed("facebook", e.target.value)}
+              style={inputStyle} placeholder="facebook.com/pagina" />
+          </Campo>
+        </div>
 
         <Campo label="Ruta de acceso">
           <select value={form.ruta||""} onChange={e=>actualizar("ruta", e.target.value)} style={inputStyle}>
