@@ -238,12 +238,14 @@ const MENSAJES_PEDIDO_DATOS = [
 ];
 
 // Promoción puntual de Kit de Placard y Bisagra Cazoleta Bronzen: el mensaje
-// de texto se manda por WhatsApp, y los flyers (imágenes) son recordatorios
+// de texto se manda por WhatsApp (con saludo dinámico agregado en cada modal,
+// igual que en Primer contacto), y los flyers (imágenes) son recordatorios
 // para mandar manualmente, igual que con los PDFs de precios.
-const MENSAJES_PROMO_BRONZEN = [
-  {tipo:"whatsapp", texto:"Te paso una promoción de kit de placard y bisagra cazoleta con precio neto para carpintero en productos Bronzen 👇"},
+const TEXTO_PROMO_BRONZEN = "Te paso una promoción de kit de placard y bisagra cazoleta con precio neto para carpintero en productos Bronzen 👇";
+const MENSAJES_PROMO_BRONZEN_RECORDATORIOS = [
   {tipo:"recordatorio", texto:"Mandá el flyer de Kit de Placard Bronzen manualmente desde WhatsApp."},
   {tipo:"recordatorio", texto:"Mandá el flyer de Bisagra Cazoleta 35mm Bronzen manualmente desde WhatsApp."},
+  {tipo:"whatsapp", texto:"Cualquier consulta o pedido quedo a su disposición."},
 ];
 
 const DIAS_SEMANA = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes"];
@@ -1409,11 +1411,17 @@ function ModalPrimerContacto({carpintero, onCerrar, onRegistrarEnvio, onMarcarDa
     {tipo:"whatsapp", texto: mensajeNotificacionViaje(modoViaje, diasViaje)},
   ], [modoViaje, diasViaje]);
 
+  const mensajesPromo = useMemo(()=> [
+    {tipo:"whatsapp", texto: saludoSegunHora()},
+    {tipo:"whatsapp", texto: TEXTO_PROMO_BRONZEN},
+    ...MENSAJES_PROMO_BRONZEN_RECORDATORIOS,
+  ], []);
+
   const mensajes = etapa==="primero" ? mensajesPrimero
     : etapa==="segundo" ? MENSAJES_SEGUNDO_CONTACTO
     : etapa==="tercero" ? MENSAJES_TERCER_CONTACTO
     : etapa==="datos" ? MENSAJES_PEDIDO_DATOS
-    : etapa==="promo" ? MENSAJES_PROMO_BRONZEN
+    : etapa==="promo" ? mensajesPromo
     : mensajesViaje;
 
   const NOMBRE_ETAPA = {
@@ -1567,10 +1575,16 @@ function ModalEnvioMasivo({carpinteros, onRegistrarEnvio, onCerrar}){
     {tipo:"whatsapp", texto: mensajeNotificacionViaje(modoViaje, diasViaje)},
   ], [modoViaje, diasViaje]);
 
+  const mensajesPromo = useMemo(()=> [
+    {tipo:"whatsapp", texto: saludoSegunHora()},
+    {tipo:"whatsapp", texto: TEXTO_PROMO_BRONZEN},
+    ...MENSAJES_PROMO_BRONZEN_RECORDATORIOS,
+  ], []);
+
   const mensajes = etapa==="primero" ? mensajesPrimero
     : etapa==="segundo" ? MENSAJES_SEGUNDO_CONTACTO
     : etapa==="tercero" ? MENSAJES_TERCER_CONTACTO
-    : etapa==="promo" ? MENSAJES_PROMO_BRONZEN
+    : etapa==="promo" ? mensajesPromo
     : mensajesViaje;
 
   const NOMBRE_ETAPA = {
