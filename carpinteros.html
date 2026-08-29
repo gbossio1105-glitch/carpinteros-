@@ -356,6 +356,16 @@ function etapaCompletada(carpintero, nombreEtapa, totalMensajes){
   return eventos.some(ev => ev.comentario === patron);
 }
 
+// Revisa si se envió AL MENOS UNO de los mensajes de una etapa (a diferencia
+// de etapaCompletada, que exige específicamente el último). Se usa para
+// detectar "ya le mandé Notificación de viaje" o "ya le mandé Promo Bronzen",
+// donde alcanza con un solo mensaje enviado para considerar que esa etapa ya
+// se usó con ese carpintero.
+function seLeMandoAlgunMensajeDe(carpintero, nombreEtapa){
+  const eventos = carpintero.eventos || [];
+  return eventos.some(ev => (ev.comentario||"").startsWith(`${nombreEtapa} — Mensaje`));
+}
+
 // Una pestaña de mensajes se oculta si el usuario la ocultó manualmente, o si
 // ya se completó (se mandaron todos sus mensajes). "Notificación de viaje"
 // nunca se oculta, sin importar nada (se maneja aparte, no llama a esto).
@@ -363,6 +373,17 @@ function pestanaOculta(carpintero, etapaKey, nombreEtapa, totalMensajes){
   const ocultosManual = carpintero.mensajesOcultos || [];
   if(ocultosManual.includes(etapaKey)) return true;
   return etapaCompletada(carpintero, nombreEtapa, totalMensajes);
+}
+
+// Las pestañas de Primer/Segundo/Tercer contacto (la "presentación inicial")
+// se ocultan si, además de completarse por su cuenta, ya se le mandó
+// Notificación de viaje o Promo Bronzen — cualquiera de las dos alcanza,
+// porque ambas son señal de que ya se superó la etapa de presentación.
+function pestanaContactoInicialOculta(carpintero, etapaKey, nombreEtapa, totalMensajes){
+  if(pestanaOculta(carpintero, etapaKey, nombreEtapa, totalMensajes)) return true;
+  if(seLeMandoAlgunMensajeDe(carpintero, "Notificación de viaje")) return true;
+  if(seLeMandoAlgunMensajeDe(carpintero, "Promo Bronzen")) return true;
+  return false;
 }
 
 // Calcula si corresponde mostrar la alerta de "hace mucho sin novedades" para
@@ -1501,9 +1522,9 @@ function ModalPrimerContacto({carpintero, onCerrar, onRegistrarEnvio, onMarcarDa
   // manualmente, o si ya se completó (se mandaron todos sus mensajes). La
   // pestaña de "Pedido de datos" sigue con su propia lógica ya existente
   // (carpintero.datosCompletos), y "Notificación de viaje" nunca se oculta.
-  const ocultarPrimero = pestanaOculta(carpintero, "primero", NOMBRE_ETAPA.primero, mensajesPrimero.length);
-  const ocultarSegundo = pestanaOculta(carpintero, "segundo", NOMBRE_ETAPA.segundo, MENSAJES_SEGUNDO_CONTACTO.length);
-  const ocultarTercero = pestanaOculta(carpintero, "tercero", NOMBRE_ETAPA.tercero, MENSAJES_TERCER_CONTACTO.length);
+  const ocultarPrimero = pestanaContactoInicialOculta(carpintero, "primero", NOMBRE_ETAPA.primero, mensajesPrimero.length);
+  const ocultarSegundo = pestanaContactoInicialOculta(carpintero, "segundo", NOMBRE_ETAPA.segundo, MENSAJES_SEGUNDO_CONTACTO.length);
+  const ocultarTercero = pestanaContactoInicialOculta(carpintero, "tercero", NOMBRE_ETAPA.tercero, MENSAJES_TERCER_CONTACTO.length);
   const ocultarPromo = pestanaOculta(carpintero, "promo", NOMBRE_ETAPA.promo, mensajesPromo.length);
 
   function ocultarPestanaActual(){
