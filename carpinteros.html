@@ -290,7 +290,25 @@ function saludoSegunHora(){
 // desde Primer contacto empiezan con "Primer/Segundo/Tercer contacto —").
 const ETAPAS_CONTACTO = ["Primer contacto", "Segundo contacto", "Tercer contacto"];
 
+// Revisa si se envió AL MENOS UNO de los mensajes de una etapa puntual (a
+// diferencia de etapaCompletada, más abajo, que exige específicamente el
+// último mensaje). Se usa para detectar "ya le mandé Notificación de viaje"
+// o "ya le mandé Promo Bronzen", donde alcanza con un solo mensaje enviado
+// para considerar que esa etapa ya se usó con ese carpintero.
+function seLeMandoAlgunMensajeDe(carpintero, nombreEtapa){
+  const eventos = carpintero.eventos || [];
+  return eventos.some(ev => (ev.comentario||"").startsWith(`${nombreEtapa} — Mensaje`));
+}
+
+
+// Determina la etapa de contacto de un carpintero para el filtro. Si ya se
+// le mandó al menos un mensaje de "Promo Bronzen", esa etapa tiene prioridad
+// y reemplaza a Primer/Segundo/Tercer contacto (el carpintero "sale" de esas
+// categorías y pasa a estar solo en Promo Bronzen). Notificación de viaje NO
+// entra acá — es una etiqueta aparte e independiente, ver tieneNotificacionViaje.
 function etapaContactoDe(carpintero){
+  if(seLeMandoAlgunMensajeDe(carpintero, "Promo Bronzen")) return "Promo Bronzen";
+
   const eventos = carpintero.eventos || [];
   for(const ev of eventos){ // ya vienen ordenados con el más reciente primero
     if(!ev.comentario) continue;
@@ -298,6 +316,13 @@ function etapaContactoDe(carpintero){
     if(encontrada) return encontrada;
   }
   return "Sin contacto";
+}
+
+// Etiqueta independiente y aditiva: no reemplaza ni afecta ninguna otra
+// clasificación. Un carpintero puede estar, por ejemplo, en "Tercer contacto"
+// Y además tener esta etiqueta en true al mismo tiempo.
+function tieneNotificacionViaje(carpintero){
+  return seLeMandoAlgunMensajeDe(carpintero, "Notificación de viaje");
 }
 
 // Determina la clasificación manual más reciente (Compró o Pidió presupuesto)
@@ -354,16 +379,6 @@ function etapaCompletada(carpintero, nombreEtapa, totalMensajes){
   const eventos = carpintero.eventos || [];
   const patron = `${nombreEtapa} — Mensaje ${totalMensajes} de ${totalMensajes}`;
   return eventos.some(ev => ev.comentario === patron);
-}
-
-// Revisa si se envió AL MENOS UNO de los mensajes de una etapa (a diferencia
-// de etapaCompletada, que exige específicamente el último). Se usa para
-// detectar "ya le mandé Notificación de viaje" o "ya le mandé Promo Bronzen",
-// donde alcanza con un solo mensaje enviado para considerar que esa etapa ya
-// se usó con ese carpintero.
-function seLeMandoAlgunMensajeDe(carpintero, nombreEtapa){
-  const eventos = carpintero.eventos || [];
-  return eventos.some(ev => (ev.comentario||"").startsWith(`${nombreEtapa} — Mensaje`));
 }
 
 // Una pestaña de mensajes se oculta si el usuario la ocultó manualmente, o si
@@ -777,7 +792,11 @@ function App(){
     let lista = db.carpinteros.filter(c=>{
       if(filtroLocalidad!=="todas" && c.localidad!==filtroLocalidad) return false;
       if(filtroRuta!=="todas" && (c.ruta||"Sin especificar")!==filtroRuta) return false;
-      if(filtroEtapaContacto!=="todas" && etapaContactoDe(c)!==filtroEtapaContacto) return false;
+      if(filtroEtapaContacto==="Notificación de viaje"){
+        if(!tieneNotificacionViaje(c)) return false;
+      } else if(filtroEtapaContacto!=="todas" && etapaContactoDe(c)!==filtroEtapaContacto){
+        return false;
+      }
       if(filtroClasificacion!=="todas" && clasificacionDe(c)!==filtroClasificacion) return false;
       if(busqueda){
         const q = busqueda.toLowerCase();
@@ -801,10 +820,11 @@ function App(){
   // contacto" y "Clasificación", calculadas sobre lo que está filtrado en
   // este momento (respetando los demás filtros ya aplicados).
   const conteoEtapas = useMemo(()=>{
-    const contadores = {"Sin contacto":0, "Primer contacto":0, "Segundo contacto":0, "Tercer contacto":0};
+    const contadores = {"Sin contacto":0, "Primer contacto":0, "Segundo contacto":0, "Tercer contacto":0, "Promo Bronzen":0, "Notificación de viaje":0};
     carpinterosFiltrados.forEach(c=>{
       const etapa = etapaContactoDe(c);
       if(contadores[etapa] !== undefined) contadores[etapa]++;
+      if(tieneNotificacionViaje(c)) contadores["Notificación de viaje"]++;
     });
     return contadores;
   }, [carpinterosFiltrados]);
@@ -883,6 +903,8 @@ function App(){
             <option value="Primer contacto">Primer contacto ({conteoEtapas["Primer contacto"]})</option>
             <option value="Segundo contacto">Segundo contacto ({conteoEtapas["Segundo contacto"]})</option>
             <option value="Tercer contacto">Tercer contacto ({conteoEtapas["Tercer contacto"]})</option>
+            <option value="Promo Bronzen">Promo Bronzen ({conteoEtapas["Promo Bronzen"]})</option>
+            <option value="Notificación de viaje">Notificación de viaje ({conteoEtapas["Notificación de viaje"]})</option>
           </select>
           <select value={filtroClasificacion} onChange={e=>setFiltroClasificacion(e.target.value)} style={{flex:"1 1 140px", padding:"8px 10px", borderRadius:8, border:"1px solid var(--gris-300)", fontSize:13}}>
             <option value="todas">Todas las clasificaciones</option>
