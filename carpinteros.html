@@ -308,6 +308,7 @@ function seLeMandoAlgunMensajeDe(carpintero, nombreEtapa){
 // entra acá — es una etiqueta aparte e independiente, ver tieneNotificacionViaje.
 function etapaContactoDe(carpintero){
   if(seLeMandoAlgunMensajeDe(carpintero, "Promo Bronzen")) return "Promo Bronzen";
+  if(todosLosTelefonosSinWhatsapp(carpintero)) return "Sin WhatsApp";
 
   const eventos = carpintero.eventos || [];
   for(const ev of eventos){ // ya vienen ordenados con el más reciente primero
@@ -358,7 +359,7 @@ function clasificacionDe(carpintero){
   if(todosLosTelefonosSinWhatsapp(carpintero)) return CLASIFICACION_AUTO.SIN_WHATSAPP.id;
 
   const etapa = etapaContactoDe(carpintero);
-  if(etapa === "Sin contacto") return null;
+  if(etapa === "Sin contacto" || etapa === "Promo Bronzen") return null;
   if(etapa === "Primer contacto") return CLASIFICACION_AUTO.NO_CONTESTO.id;
   return CLASIFICACION_AUTO.CONTESTO.id; // Segundo o Tercer contacto ya alcanzados
 }
@@ -820,7 +821,7 @@ function App(){
   // contacto" y "Clasificación", calculadas sobre lo que está filtrado en
   // este momento (respetando los demás filtros ya aplicados).
   const conteoEtapas = useMemo(()=>{
-    const contadores = {"Sin contacto":0, "Primer contacto":0, "Segundo contacto":0, "Tercer contacto":0, "Promo Bronzen":0, "Notificación de viaje":0};
+    const contadores = {"Sin contacto":0, "Primer contacto":0, "Segundo contacto":0, "Tercer contacto":0, "Promo Bronzen":0, "Sin WhatsApp":0, "Notificación de viaje":0};
     carpinterosFiltrados.forEach(c=>{
       const etapa = etapaContactoDe(c);
       if(contadores[etapa] !== undefined) contadores[etapa]++;
@@ -904,6 +905,7 @@ function App(){
             <option value="Segundo contacto">Segundo contacto ({conteoEtapas["Segundo contacto"]})</option>
             <option value="Tercer contacto">Tercer contacto ({conteoEtapas["Tercer contacto"]})</option>
             <option value="Promo Bronzen">Promo Bronzen ({conteoEtapas["Promo Bronzen"]})</option>
+            <option value="Sin WhatsApp">Sin WhatsApp ({conteoEtapas["Sin WhatsApp"]})</option>
             <option value="Notificación de viaje">Notificación de viaje ({conteoEtapas["Notificación de viaje"]})</option>
           </select>
           <select value={filtroClasificacion} onChange={e=>setFiltroClasificacion(e.target.value)} style={{flex:"1 1 140px", padding:"8px 10px", borderRadius:8, border:"1px solid var(--gris-300)", fontSize:13}}>
